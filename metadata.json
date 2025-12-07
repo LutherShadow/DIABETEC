@@ -1,0 +1,7 @@
+{
+  "name": "VidaSalud AI",
+  "description": "Una aplicación de salud personalizada impulsada por IA para la gestión de dietas, medicamentos y ejercicios, adaptada a condiciones médicas específicas como la diabetes.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
