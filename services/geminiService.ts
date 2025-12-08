@@ -3,10 +3,28 @@ import { UserProfile, Meal, ExerciseRoutine, Medication } from "../types";
 
 // Helper to get API key safely
 const getAIClient = () => {
-  //const apiKey = process.env.API_KEY;
-  const apiKey = import.meta.env.VITE.API_KEY;
+  let apiKey: string | undefined;
+
+  // 1. Try Vite standard (import.meta.env)
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_KEY) {
+      // @ts-ignore
+      apiKey = import.meta.env.VITE_API_KEY;
+    }
+  } catch (e) {}
+
+  // 2. Try process.env (Node/Webpack/Polyfill)
   if (!apiKey) {
-    throw new Error("API Key is missing. Please ensure process.env.API_KEY is available.");
+    try {
+      if (typeof process !== 'undefined' && process.env?.API_KEY) {
+        apiKey = process.env.API_KEY;
+      }
+    } catch (e) {}
+  }
+
+  if (!apiKey) {
+    throw new Error("API Key is missing. Por favor configura VITE_API_KEY en tus variables de entorno (Vercel/env).");
   }
   return new GoogleGenAI({ apiKey });
 };
