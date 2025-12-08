@@ -3,7 +3,8 @@ import { UserProfile, Meal, ExerciseRoutine, Medication } from "../types";
 
 // Helper to get API key safely
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
+  //const apiKey = process.env.API_KEY;
+  const apiKey = import.meta.env.VITE.API_KEY;
   if (!apiKey) {
     throw new Error("API Key is missing. Please ensure process.env.API_KEY is available.");
   }
