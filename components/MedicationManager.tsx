@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Medication, UserProfile, ScheduleType, MealTrigger, MealTime, MealTiming } from '../types';
 import { analyzePrescription } from '../services/geminiService';
 import { saveProfile, toggleMedicationTaken, resetDailyTracking } from '../services/storageService';
@@ -11,7 +11,6 @@ interface Props {
 const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [manualInput, setManualInput] = useState('');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   
   // State for manual form
   const [newMed, setNewMed] = useState<{
@@ -29,72 +28,6 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
     fixedTimes: ['08:00'],
     mealTriggers: []
   });
-
-  // Helper to convert "HH:MM" to minutes from midnight
-  const getMinutesFromMidnight = (timeStr: string) => {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  // Polling for Fixed Time Notifications & Urgent Reminders
-  useEffect(() => {
-    if (!notificationsEnabled) return;
-
-    const checkSchedules = () => {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      
-      profile.medications.forEach(med => {
-        // Only check fixed schedules that haven't been taken today
-        if (med.scheduleType === 'fixed' && med.fixedTimes && !med.takenToday) {
-          
-          med.fixedTimes.forEach(timeStr => {
-            const scheduledMinutes = getMinutesFromMidnight(timeStr);
-            const diff = currentMinutes - scheduledMinutes;
-
-            // 1. Primary Alert (Exact Time or within 1 min)
-            if (diff === 0) {
-               new Notification(`💊 Hora de tu medicamento: ${med.name}`, {
-                 body: `Toma tu dosis de ${med.dosage} ahora.`,
-                 icon: '/pills-icon.png', // Optional: requires asset
-                 requireInteraction: true, // PERSISTENT: Won't close until user clicks
-                 tag: `med_primary_${med.id}_${timeStr}` // Prevent duplicate stacking
-               });
-            }
-
-            // 2. Urgent Reminder (30 minutes late)
-            if (diff === 30) {
-               new Notification(`⚠️ URGENTE: Olvidaste ${med.name}`, {
-                 body: `Han pasado 30 minutos. Registra tu toma de ${med.dosage} para mantener tu tratamiento.`,
-                 requireInteraction: true, // PERSISTENT
-                 renotify: true, // Vibrate/Sound again even if notification is open
-                 tag: `med_urgent_${med.id}_${timeStr}`, // Replaces the primary notification
-               } as any);
-            }
-          });
-        }
-      });
-    };
-
-    // Check every 30 seconds to ensure we don't miss the minute window
-    const interval = setInterval(checkSchedules, 30000); 
-    return () => clearInterval(interval);
-  }, [profile.medications, notificationsEnabled]);
-
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      setNotificationsEnabled(true);
-    }
-  }, []);
-
-  const requestNotificationPermission = async () => {
-    if (!('Notification' in window)) return;
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      setNotificationsEnabled(true);
-      new Notification('VidaSalud AI', { body: 'Notificaciones activadas correctamente.' });
-    }
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,7 +52,6 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
         alert("❌ Ocurrió un error al procesar la imagen.\nPor favor verifica tu conexión a internet o intenta ingresarlo manualmente.");
       } finally {
         setAnalyzing(false);
-        // Clear input allows re-selecting the same file if needed
         e.target.value = '';
       }
     };
@@ -195,7 +127,7 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
       dosage: newMed.dosage || 'Según indicación',
       frequency: freqText,
       instructions: newMed.instructions || '',
-      requiresFood: newMed.scheduleType === 'meal_relative', // Implicit
+      requiresFood: newMed.scheduleType === 'meal_relative', 
       takenToday: false,
       scheduleType: newMed.scheduleType,
       fixedTimes: newMed.scheduleType === 'fixed' ? newMed.fixedTimes : undefined,
@@ -211,14 +143,10 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
         name: '', dosage: '', instructions: '', 
         scheduleType: 'fixed', fixedTimes: ['08:00'], mealTriggers: [] 
     });
-
-    if (notificationsEnabled) {
-      new Notification('Recordatorio Configurado', { body: `Te recordaremos tomar ${med.name} según el horario configurado.` });
-    }
   };
 
   const addMedsToProfile = (newMeds: Partial<Medication>[]) => {
-    // Simplified adder for AI results - defaults to fixed 8am for safety, user can edit
+    // Simplified adder for AI results
     const validMeds: Medication[] = newMeds.map(m => ({
       id: Math.random().toString(36).substr(2, 9),
       name: m.name || 'Desconocido',
@@ -265,14 +193,6 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
           <span>💊</span> Mis Medicamentos
         </h2>
         <div className="flex gap-2">
-            {!notificationsEnabled && (
-            <button 
-                onClick={requestNotificationPermission}
-                className="text-xs bg-teal-100 text-teal-700 px-3 py-2 rounded-full hover:bg-teal-200 transition"
-            >
-                🔔 Activar Alertas
-            </button>
-            )}
             <button 
                 onClick={handleNewDay}
                 className="text-sm bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition font-medium flex items-center gap-2"
@@ -379,7 +299,7 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
         </button>
       </div>
 
-      {/* AI Add Section (Collapsed) */}
+      {/* AI Add Section */}
       <details className="bg-blue-50 rounded-xl border border-blue-100 shadow-sm overflow-hidden">
         <summary className="p-4 font-semibold text-blue-900 cursor-pointer hover:bg-blue-100 transition list-none flex justify-between">
             <span>📷 O escanear receta con IA...</span>

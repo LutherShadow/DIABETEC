@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, ExerciseRoutine } from '../types';
 import { generateExerciseRoutine } from '../services/geminiService';
+import { saveProfile } from '../services/storageService';
 
 interface Props {
   profile: UserProfile;
 }
 
 const ExerciseCoach: React.FC<Props> = ({ profile }) => {
-  const [routine, setRoutine] = useState<ExerciseRoutine | null>(null);
+  // Initialize from persisted profile data
+  const [routine, setRoutine] = useState<ExerciseRoutine | null>(profile.exerciseRoutine || null);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
   const [timerActive, setTimerActive] = useState(false);
@@ -32,6 +34,13 @@ const ExerciseCoach: React.FC<Props> = ({ profile }) => {
     }
 
     setRoutine(result);
+    
+    // PERSISTENCE: Save to Supabase
+    if (result) {
+        const updatedProfile = { ...profile, exerciseRoutine: result };
+        saveProfile(updatedProfile);
+    }
+    
     setLoading(false);
   };
 
@@ -73,7 +82,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile }) => {
               disabled={loading}
               className="bg-orange-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 shadow-md transition"
             >
-              {loading ? 'Diseñando rutina...' : '✨ Nueva Rutina IA'}
+              {loading ? 'Diseñando rutina...' : (routine ? 'Nueva Rutina' : 'Generar Rutina')}
             </button>
         </div>
       </div>
@@ -174,6 +183,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile }) => {
               <h3 className="text-xl font-bold text-gray-700">Tu Entrenador Personal AI</h3>
               <p className="text-gray-500 max-w-md mx-auto mt-2">
                   Genera una rutina segura adaptada a tu {profile.diagnoses[0] || 'perfil'}, con temporizadores y guías visuales.
+                  <br/><span className="text-xs">Se guardará automáticamente.</span>
               </p>
               <button onClick={handleGenerate} className="mt-6 bg-orange-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-700 shadow-lg transition">
                   Comenzar Entrenamiento

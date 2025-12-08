@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile, Meal } from '../types';
 import { generateDailyMealPlan, generateMealImage } from '../services/geminiService';
+import { saveProfile } from '../services/storageService';
 
 interface Props {
   profile: UserProfile;
 }
 
 const MealPlanner: React.FC<Props> = ({ profile }) => {
-  const [meals, setMeals] = useState<Meal[]>([]);
+  // Initialize with persisted data if available
+  const [meals, setMeals] = useState<Meal[]>(profile.mealPlan || []);
   const [loading, setLoading] = useState(false);
   const [generatingImageFor, setGeneratingImageFor] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     setLoading(true);
-    setMeals([]);
-    const plan = await generateDailyMealPlan(profile);
-    setMeals(plan);
-    setLoading(false);
+    // Clear old state visually
+    setMeals([]); 
+    
+    try {
+        const plan = await generateDailyMealPlan(profile);
+        setMeals(plan);
+        
+        // PERSISTENCE: Save to Supabase via Profile
+        const updatedProfile = { ...profile, mealPlan: plan };
+        saveProfile(updatedProfile);
+        
+    } catch (error) {
+        console.error("Error generating meals", error);
+        alert("Hubo un error al generar el plan. Intenta de nuevo.");
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleLoadImage = async (mealName: string, description: string, index: number) => {
@@ -26,6 +41,10 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
           const newMeals = [...meals];
           newMeals[index].imageUrl = imageUrl;
           setMeals(newMeals);
+          
+          // PERSISTENCE: Save image URL updates
+          const updatedProfile = { ...profile, mealPlan: newMeals };
+          saveProfile(updatedProfile);
       }
       setGeneratingImageFor(null);
   };
@@ -39,9 +58,9 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
         <button 
           onClick={handleGenerate}
           disabled={loading}
-          className="bg-teal-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2"
+          className="bg-teal-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2 shadow-sm"
         >
-          {loading ? 'Consultando IA...' : 'Generar Nuevo Menú'}
+          {loading ? 'Consultando IA...' : (meals.length > 0 ? 'Regenerar Menú' : 'Generar Menú')}
         </button>
       </div>
 
@@ -97,8 +116,10 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
       </div>
       
       {!loading && meals.length === 0 && (
-        <div className="text-center py-10 text-gray-400">
-           Presiona "Generar" para obtener un plan basado en tu perfil médico.
+        <div className="text-center py-10 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+           Presiona "Generar Menú" para obtener un plan basado en tu perfil médico.
+           <br/>
+           <span className="text-sm">Se guardará automáticamente en tu perfil.</span>
         </div>
       )}
     </div>

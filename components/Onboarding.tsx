@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
-import { saveProfile } from '../services/storageService';
+import { saveProfile, setUserId } from '../services/storageService';
 
 interface OnboardingProps {
   onComplete: () => void;
+  onLoginClick: () => void;
 }
 
-const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
+const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<Partial<UserProfile>>({
     diagnoses: [],
@@ -19,15 +20,29 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
   // Local state for the inputs in Step 3
   const [allowedInput, setAllowedInput] = useState('');
   const [forbiddenInput, setForbiddenInput] = useState('');
+  
+  // Step 1: Identification
+  const [email, setEmail] = useState('');
 
   const handleNext = () => setStep(p => p + 1);
   const handleBack = () => setStep(p => p - 1);
 
   const handleComplete = () => {
+    if (!email.includes('@')) {
+        alert("Por favor ingresa un email válido para guardar tu progreso.");
+        setStep(1);
+        return;
+    }
+
+    // Set the User ID to the email for Supabase keying
+    setUserId(email.trim().toLowerCase());
+
     const finalProfile = {
       ...formData,
+      id: email.trim().toLowerCase(),
       onboardingComplete: true
     } as UserProfile;
+    
     saveProfile(finalProfile);
     onComplete();
   };
@@ -47,6 +62,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       goals: "Controlar glucosa y mantener peso",
       medications: []
     });
+    setEmail("demo@vidasalud.ai");
   };
 
   // Helper for Chip/Tag Input Logic
@@ -102,9 +118,21 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         <div className="space-y-4 animate-fade-in">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-semibold text-gray-800">Datos Básicos</h3>
-                <button onClick={loadDemoData} className="text-xs text-teal-600 underline font-medium">Cargar Caso de Prueba (Demo)</button>
+                <div className="flex gap-4 items-center">
+                    <button onClick={loadDemoData} className="text-xs text-teal-600 underline font-medium">Demo</button>
+                    <button onClick={onLoginClick} className="text-sm bg-teal-50 text-teal-700 px-3 py-1 rounded-lg border border-teal-200 hover:bg-teal-100">¿Ya tienes cuenta?</button>
+                </div>
             </div>
           
+          <div>
+             <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico (Tu ID)</label>
+             <input 
+              type="email" placeholder="ejemplo@correo.com" className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+              value={email} onChange={e => setEmail(e.target.value)}
+             />
+             <p className="text-xs text-gray-400 mt-1">Usaremos esto para guardar tu progreso en la nube.</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
@@ -264,7 +292,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             Siguiente
           </button>
         ) : (
-          <button onClick={handleComplete} className="px-6 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-bold shadow-md transition transform hover:scale-105">
+          <button onClick={handleComplete} disabled={!email} className="px-6 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-bold shadow-md transition transform hover:scale-105 disabled:opacity-50">
             Finalizar Perfil
           </button>
         )}

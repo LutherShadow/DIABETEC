@@ -1,3 +1,4 @@
+
 export type ScheduleType = 'fixed' | 'meal_relative';
 export type MealTime = 'breakfast' | 'lunch' | 'dinner';
 export type MealTiming = 'before' | 'after';
@@ -31,23 +32,6 @@ export interface MedicationLog {
   status: 'taken' | 'skipped';
 }
 
-export interface UserProfile {
-  name: string;
-  age: number;
-  gender: 'male' | 'female' | 'other';
-  height: number; // cm
-  weight: number; // kg
-  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete';
-  diagnoses: string[]; // e.g., "Diabetes Type 2"
-  allowedFoods: string[];
-  forbiddenFoods: string[];
-  allergies: string[];
-  goals: string;
-  medications: Medication[];
-  history: MedicationLog[]; // New: Log of taken medications
-  onboardingComplete: boolean;
-}
-
 export interface Meal {
   name: string;
   description: string;
@@ -74,4 +58,26 @@ export interface ExerciseRoutine {
   safetyNotes: string;
 }
 
-export type ViewState = 'onboarding' | 'dashboard' | 'meals' | 'medications' | 'exercise';
+export interface UserProfile {
+  id?: string; // Add ID field to track email/user-id
+  name: string;
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  height: number; // cm
+  weight: number; // kg
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete';
+  diagnoses: string[]; // e.g., "Diabetes Type 2"
+  allowedFoods: string[];
+  forbiddenFoods: string[];
+  allergies: string[];
+  goals: string;
+  medications: Medication[];
+  history: MedicationLog[]; 
+  onboardingComplete: boolean;
+  
+  // Persisted Generated Content
+  mealPlan?: Meal[];
+  exerciseRoutine?: ExerciseRoutine | null;
+}
+
+export type ViewState = 'login' | 'onboarding' | 'dashboard' | 'meals' | 'medications' | 'exercise';
