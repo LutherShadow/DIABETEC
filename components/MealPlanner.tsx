@@ -36,17 +36,24 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
 
   const handleLoadImage = async (mealName: string, description: string, index: number) => {
       setGeneratingImageFor(mealName);
-      const imageUrl = await generateMealImage(`${mealName}. ${description}`);
-      if (imageUrl) {
-          const newMeals = [...meals];
-          newMeals[index].imageUrl = imageUrl;
-          setMeals(newMeals);
-          
-          // PERSISTENCE: Save image URL updates
-          const updatedProfile = { ...profile, mealPlan: newMeals };
-          saveProfile(updatedProfile);
+      try {
+          const imageUrl = await generateMealImage(`${mealName}. ${description}`);
+          if (imageUrl) {
+              const newMeals = [...meals];
+              newMeals[index].imageUrl = imageUrl;
+              setMeals(newMeals);
+              
+              // PERSISTENCE: Save image URL updates
+              const updatedProfile = { ...profile, mealPlan: newMeals };
+              saveProfile(updatedProfile);
+          } else {
+              alert("⚠️ No se pudo generar la imagen. Es posible que el servicio esté saturado temporalmente.");
+          }
+      } catch (e) {
+          alert("Error de conexión al generar imagen.");
+      } finally {
+          setGeneratingImageFor(null);
       }
-      setGeneratingImageFor(null);
   };
 
   return (

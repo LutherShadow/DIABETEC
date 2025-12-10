@@ -55,6 +55,12 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
   const addFixedTime = () => {
       setNewMed(prev => ({ ...prev, fixedTimes: [...prev.fixedTimes, '08:00'] }));
   };
+  
+  const setFrequencyPattern = (hours: number) => {
+      if (hours === 24) setNewMed(prev => ({ ...prev, scheduleType: 'fixed', fixedTimes: ['08:00'] }));
+      if (hours === 12) setNewMed(prev => ({ ...prev, scheduleType: 'fixed', fixedTimes: ['08:00', '20:00'] }));
+      if (hours === 8) setNewMed(prev => ({ ...prev, scheduleType: 'fixed', fixedTimes: ['08:00', '16:00', '23:00'] }));
+  };
 
   const updateFixedTime = (index: number, val: string) => {
       const updated = [...newMed.fixedTimes];
@@ -349,7 +355,12 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
                 <div>
                     <div className="flex justify-between items-center mb-2">
                         <label className="text-sm font-bold text-gray-600">Horas de Toma:</label>
-                        <button onClick={addFixedTime} className="text-teal-600 text-xs font-bold">+ Agregar hora</button>
+                        <div className="flex gap-2">
+                             <span className="text-xs text-gray-400 self-center hidden md:inline">Rápido:</span>
+                             <button onClick={() => setFrequencyPattern(12)} className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded">Cada 12h</button>
+                             <button onClick={() => setFrequencyPattern(8)} className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded">Cada 8h</button>
+                             <button onClick={addFixedTime} className="text-teal-600 text-xs font-bold ml-2">+ Manual</button>
+                        </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {newMed.fixedTimes.map((time, idx) => (
@@ -366,7 +377,6 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
                             </div>
                         ))}
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">Ej: Para "Cada 12 horas", agrega 08:00 y 20:00.</p>
                 </div>
             ) : (
                 <div>

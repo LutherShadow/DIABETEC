@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { UserProfile, Meal, ExerciseRoutine, Medication } from "../types";
 
 // Helper to get API key safely
@@ -27,6 +27,20 @@ const getAIClient = () => {
     throw new Error("API Key is missing. Por favor configura VITE_API_KEY en tus variables de entorno (Vercel/env).");
   }
   return new GoogleGenAI({ apiKey });
+};
+
+// Retry helper for 429 errors
+const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
+    try {
+        return await fn();
+    } catch (error: any) {
+        if (retries > 0 && (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota'))) {
+            console.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} attempts left)`);
+            await new Promise(res => setTimeout(res, delay));
+            return retry(fn, retries - 1, delay * 2);
+        }
+        throw error;
+    }
 };
 
 // Helper to clean JSON string (remove markdown blocks and find valid JSON bounds)
@@ -86,6 +100,7 @@ export const analyzePrescription = async (input: string, isImage: boolean): Prom
         - timing: "before" (antes) o "after" (después/con alimentos). Por defecto "after".
         
         CRÍTICO:
+        - Asegúrate de que la cantidad de horarios en 'suggestedTimes' coincida con la frecuencia (ej: 12h = 2 items).
         - Devuelve JSON válido.
     `;
 
@@ -108,7 +123,7 @@ export const analyzePrescription = async (input: string, isImage: boolean): Prom
         contents = { parts: [{ text: `Analiza este texto de receta médica: "${input}". ${prompt}` }] };
     }
 
-    const response = await ai.models.generateContent({
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: contents,
       config: {
@@ -131,7 +146,7 @@ export const analyzePrescription = async (input: string, isImage: boolean): Prom
           }
         }
       }
-    });
+    }));
     
     const cleanedText = cleanJSON(response.text || "[]");
     return JSON.parse(cleanedText);
@@ -163,7 +178,7 @@ export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[
         Devuelve JSON Array.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -184,7 +199,7 @@ export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[
           }
         }
       }
-    });
+    }));
 
     const cleanedText = cleanJSON(response.text || "[]");
     return JSON.parse(cleanedText);
@@ -200,13 +215,13 @@ export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[
 export const generateMealImage = async (mealDescription: string): Promise<string | null> => {
   try {
       const ai = getAIClient();
-      const response = await ai.models.generateContent({
+      const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
         contents: {
             parts: [{ text: `Professional food photography, delicious, healthy: ${mealDescription}` }]
         },
         config: {}
-      });
+      }));
       
       for (const part of response.candidates?.[0]?.content?.parts || []) {
           if (part.inlineData) {
@@ -216,6 +231,7 @@ export const generateMealImage = async (mealDescription: string): Promise<string
       return null;
   } catch (error) {
       console.error("Image gen failed", error);
+      // We don't throw here to let the UI continue without image
       return null;
   }
 };
@@ -240,7 +256,7 @@ export const generateExerciseRoutine = async (profile: UserProfile): Promise<Exe
         Devuelve JSON válido.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -271,7 +287,7 @@ export const generateExerciseRoutine = async (profile: UserProfile): Promise<Exe
           }
         }
       }
-    });
+    }));
     
     const cleanedText = cleanJSON(response.text || "null");
     return JSON.parse(cleanedText);
