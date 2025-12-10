@@ -55,7 +55,7 @@ export const getProfile = (): UserProfile => {
 
 // --- Async Cloud Sync ---
 const pushToSupabase = async (profile: UserProfile) => {
-  const uid = getUserId(); // Use the ID from local storage (which is now the email)
+  const uid = getUserId(); 
   
   const { error } = await supabase
     .from('profiles')
@@ -158,7 +158,7 @@ export const loginUser = async (email: string): Promise<{ success: boolean; mess
 
         // Update Local Storage
         setUserId(cleanEmail);
-        saveProfile(cloudProfile); // Use safe save
+        saveProfile(cloudProfile); 
         
         return { success: true };
     } catch (e) {
@@ -170,14 +170,61 @@ export const loginUser = async (email: string): Promise<{ success: boolean; mess
 export const logoutUser = () => {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(USER_ID_KEY);
-    // Optional: supabase.auth.signOut() if using Supabase Auth in the future
 };
 
 // --- Initialization Logic ---
 export const initializeData = async (): Promise<UserProfile> => {
-  // Just return local data if it exists. 
-  // We rely on "Login" explicitly to fetch from cloud to avoid overwriting.
+  // 1. Get Local Data (Fast)
   const localProfile = getProfile();
+  
+  // 2. Check if user is logged in (has ID) and try to fetch latest from Cloud
+  // This is critical if local storage had to strip images due to Quota limits.
+  const uid = localStorage.getItem(USER_ID_KEY);
+  
+  if (uid && uid.includes('@')) { // Basic check for valid ID
+      try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', uid)
+            .single();
+            
+          if (data && !error) {
+               const cloudProfile: UserProfile = {
+                    id: data.id,
+                    name: data.name,
+                    age: data.age,
+                    gender: data.gender,
+                    height: data.height,
+                    weight: data.weight,
+                    activityLevel: data.activity_level,
+                    goals: data.goals,
+                    diagnoses: data.diagnoses || [],
+                    allowedFoods: data.allowed_foods || [],
+                    forbiddenFoods: data.forbidden_foods || [],
+                    allergies: data.allergies || [],
+                    medications: data.medications || [],
+                    history: data.history || [],
+                    onboardingComplete: data.onboarding_complete,
+                    mealPlan: data.meal_plan || [],
+                    exerciseRoutine: data.exercise_routine || null
+                };
+                
+                // If cloud has a meal plan with images and local doesn't, cloud wins
+                if (localProfile.mealPlan && cloudProfile.mealPlan && cloudProfile.mealPlan.length > 0) {
+                     // Simple merge: prefer Cloud
+                     return cloudProfile;
+                }
+                
+                // Update local storage with fresh cloud data
+                saveProfile(cloudProfile);
+                return cloudProfile;
+          }
+      } catch (err) {
+          console.warn("Could not hydrate from cloud on init, using local.", err);
+      }
+  }
+
   return localProfile;
 };
 
@@ -196,7 +243,7 @@ const getTargetDoses = (med: Medication): number => {
 const getTodayDoseCount = (history: MedicationLog[], medId: string): number => {
     const todayStr = new Date().toDateString();
     return history.filter(h => 
-        h.medName === medId || // Legacy support (some logs used medName as ID)
+        h.medName === medId || 
         (h.medName === getProfile().medications.find(m => m.id === medId)?.name && new Date(h.timestamp).toDateString() === todayStr)
     ).length;
 };
@@ -213,7 +260,7 @@ export const recordMedicationDose = (medId: string, context: string = 'Manual'):
   // 1. Add Log Entry
   const logEntry: MedicationLog = {
       id: Date.now().toString(),
-      medName: med.name, // Storing Name for display readability
+      medName: med.name, 
       timestamp: new Date().toISOString(),
       formattedDate: new Date().toLocaleString('es-ES', { 
         weekday: 'short', hour: '2-digit', minute: '2-digit' 
@@ -224,7 +271,6 @@ export const recordMedicationDose = (medId: string, context: string = 'Manual'):
   newHistory.unshift(logEntry);
 
   // 2. Check if daily goal is met
-  // Count how many logs exist for this med TODAY (including the one we just added)
   const todayStr = new Date().toDateString();
   const takenCount = newHistory.filter(h => 
       h.medName === med.name && 
@@ -279,9 +325,7 @@ export const removeLastMedicationDose = (medId: string): UserProfile => {
 
 export const deleteMedication = (medId: string): UserProfile => {
     const profile = getProfile();
-    // Filter out the medication with the given ID
     const updatedMeds = profile.medications.filter(m => m.id !== medId);
-    
     const newProfile = { ...profile, medications: updatedMeds };
     saveProfile(newProfile);
     return newProfile;

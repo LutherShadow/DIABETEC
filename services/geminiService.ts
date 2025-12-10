@@ -29,7 +29,7 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// Retry helper for 429 errors (Increased delay to 4000ms to handle quotas better)
+// Retry helper for 429 errors
 const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promise<T> => {
     try {
         return await fn();
@@ -57,6 +57,48 @@ const cleanJSON = (text: string) => {
       cleaned = cleaned.substring(start, end + 1);
   }
   return cleaned;
+};
+
+// --- IMAGE COMPRESSION HELPER ---
+// Converts massive PNG base64 from Gemini to optimized JPEG base64
+const compressBase64Image = (base64Str: string): Promise<string> => {
+    return new Promise((resolve) => {
+        try {
+            const img = new Image();
+            // Handle both raw base64 and data URI
+            const src = base64Str.startsWith('data:') ? base64Str : `data:image/png;base64,${base64Str}`;
+            img.src = src;
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                // Resize to max 800px width to save massive space
+                const MAX_WIDTH = 800;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height = height * (MAX_WIDTH / width);
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    // Compress to JPEG 0.7 quality
+                    const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    resolve(optimizedBase64);
+                } else {
+                    resolve(src); // Fallback to original
+                }
+            };
+            img.onerror = () => resolve(src); // Fallback
+        } catch (e) {
+            resolve(base64Str.startsWith('data:') ? base64Str : `data:image/png;base64,${base64Str}`);
+        }
+    });
 };
 
 export const analyzePrescription = async (input: string, isImage: boolean): Promise<any[]> => {
@@ -172,14 +214,15 @@ export const generateMealImage = async (mealDescription: string): Promise<string
       
       for (const part of response.candidates?.[0]?.content?.parts || []) {
           if (part.inlineData) {
-              return `data:image/png;base64,${part.inlineData.data}`;
+              // COMPRESS: Optimize image before returning to save Storage Quota
+              const rawBase64 = part.inlineData.data;
+              const optimizedImage = await compressBase64Image(rawBase64);
+              return optimizedImage;
           }
       }
       return null;
   } catch (error) {
-      // Fallback gracefully instead of throwing, so the UI can show a placeholder
       console.warn("Image gen failed (Quota/Error). Using placeholder.", error);
-      const seed = Math.floor(Math.random() * 1000);
       const text = mealDescription.split(' ')[0] || 'Comida';
       return `https://placehold.co/600x400/e2e8f0/475569?text=${encodeURIComponent(text)}`;
   }
