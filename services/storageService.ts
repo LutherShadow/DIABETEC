@@ -88,14 +88,35 @@ const pushToSupabase = async (profile: UserProfile) => {
 };
 
 export const saveProfile = (profile: UserProfile): void => {
+  // 1. Sync Cloud (Background) - We do this regardless of local storage success
+  pushToSupabase(profile).catch(err => console.error("Cloud sync failed silently", err));
+
+  // 2. Save Local (Instant)
   try {
-    // 1. Save Local (Instant)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    
-    // 2. Sync Cloud (Background)
-    pushToSupabase(profile);
-  } catch (e) {
-    console.error('Error saving profile', e);
+  } catch (e: any) {
+    // Handle Quota Exceeded (usually due to base64 images)
+    if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+      console.warn("LocalStorage limit exceeded. Stripping images to save critical data.");
+      
+      // Create a shallow copy and strip heavy fields (images in mealPlan)
+      const lightProfile = { ...profile };
+      if (lightProfile.mealPlan && lightProfile.mealPlan.length > 0) {
+        lightProfile.mealPlan = lightProfile.mealPlan.map(meal => ({
+          ...meal,
+          imageUrl: undefined // Remove base64 string
+        }));
+      }
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(lightProfile));
+        console.log("Profile saved locally without images.");
+      } catch (retryError) {
+        console.error('Error saving light profile', retryError);
+      }
+    } else {
+      console.error('Error saving profile locally', e);
+    }
   }
 };
 
@@ -137,7 +158,7 @@ export const loginUser = async (email: string): Promise<{ success: boolean; mess
 
         // Update Local Storage
         setUserId(cleanEmail);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudProfile));
+        saveProfile(cloudProfile); // Use safe save
         
         return { success: true };
     } catch (e) {
