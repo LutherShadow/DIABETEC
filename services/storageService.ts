@@ -160,41 +160,110 @@ export const initializeData = async (): Promise<UserProfile> => {
   return localProfile;
 };
 
-export const toggleMedicationTaken = (medId: string, context: string = 'Manual'): UserProfile => {
+// Helper to determine target doses
+const getTargetDoses = (med: Medication): number => {
+    if (med.scheduleType === 'fixed' && med.fixedTimes) {
+        return med.fixedTimes.length || 1;
+    }
+    if (med.scheduleType === 'meal_relative' && med.mealTriggers) {
+        return med.mealTriggers.length || 1;
+    }
+    return 1; // Default
+};
+
+// Helper to count today's doses
+const getTodayDoseCount = (history: MedicationLog[], medId: string): number => {
+    const todayStr = new Date().toDateString();
+    return history.filter(h => 
+        h.medName === medId || // Legacy support (some logs used medName as ID)
+        (h.medName === getProfile().medications.find(m => m.id === medId)?.name && new Date(h.timestamp).toDateString() === todayStr)
+    ).length;
+};
+
+export const recordMedicationDose = (medId: string, context: string = 'Manual'): UserProfile => {
   const profile = getProfile();
   let newHistory = [...(profile.history || [])];
+  
+  const medIndex = profile.medications.findIndex(m => m.id === medId);
+  if (medIndex === -1) return profile;
 
-  const updatedMeds = profile.medications.map(med => {
-    if (med.id === medId) {
-      const isNowTaken = !med.takenToday;
-      
-      if (isNowTaken) {
-        const logEntry: MedicationLog = {
-          id: Date.now().toString(),
-          medName: med.name,
-          timestamp: new Date().toISOString(),
-          formattedDate: new Date().toLocaleString('es-ES', { 
-            weekday: 'short', 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          status: 'taken',
-          context: context
-        };
-        newHistory.unshift(logEntry);
-      }
+  const med = profile.medications[medIndex];
+  
+  // 1. Add Log Entry
+  const logEntry: MedicationLog = {
+      id: Date.now().toString(),
+      medName: med.name, // Storing Name for display readability
+      timestamp: new Date().toISOString(),
+      formattedDate: new Date().toLocaleString('es-ES', { 
+        weekday: 'short', hour: '2-digit', minute: '2-digit' 
+      }),
+      status: 'taken',
+      context: context
+  };
+  newHistory.unshift(logEntry);
 
-      return { ...med, takenToday: isNowTaken };
-    }
-    return med;
-  });
+  // 2. Check if daily goal is met
+  // Count how many logs exist for this med TODAY (including the one we just added)
+  const todayStr = new Date().toDateString();
+  const takenCount = newHistory.filter(h => 
+      h.medName === med.name && 
+      new Date(h.timestamp).toDateString() === todayStr
+  ).length;
+
+  const target = getTargetDoses(med);
+  const isFullyCompleted = takenCount >= target;
+
+  const updatedMeds = [...profile.medications];
+  updatedMeds[medIndex] = { ...med, takenToday: isFullyCompleted };
 
   const newProfile = { ...profile, medications: updatedMeds, history: newHistory };
   saveProfile(newProfile);
   return newProfile;
+};
+
+export const removeLastMedicationDose = (medId: string): UserProfile => {
+    const profile = getProfile();
+    const medIndex = profile.medications.findIndex(m => m.id === medId);
+    if (medIndex === -1) return profile;
+    const med = profile.medications[medIndex];
+
+    const todayStr = new Date().toDateString();
+    const history = [...(profile.history || [])];
+    
+    // Find the index of the most recent log for this med today
+    const logIndexToRemove = history.findIndex(h => 
+        h.medName === med.name && 
+        new Date(h.timestamp).toDateString() === todayStr
+    );
+
+    if (logIndexToRemove !== -1) {
+        history.splice(logIndexToRemove, 1);
+    }
+
+    // Re-evaluate completion status
+    const takenCount = history.filter(h => 
+        h.medName === med.name && 
+        new Date(h.timestamp).toDateString() === todayStr
+    ).length;
+    
+    const target = getTargetDoses(med);
+    
+    const updatedMeds = [...profile.medications];
+    updatedMeds[medIndex] = { ...med, takenToday: takenCount >= target };
+
+    const newProfile = { ...profile, medications: updatedMeds, history: history };
+    saveProfile(newProfile);
+    return newProfile;
+};
+
+export const deleteMedication = (medId: string): UserProfile => {
+    const profile = getProfile();
+    // Filter out the medication with the given ID
+    const updatedMeds = profile.medications.filter(m => m.id !== medId);
+    
+    const newProfile = { ...profile, medications: updatedMeds };
+    saveProfile(newProfile);
+    return newProfile;
 };
 
 export const resetDailyTracking = (): UserProfile => {

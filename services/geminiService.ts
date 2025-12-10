@@ -57,30 +57,36 @@ const cleanJSON = (text: string) => {
 /**
  * Analyzes a prescription image or text to extract medication details.
  */
-export const analyzePrescription = async (input: string, isImage: boolean): Promise<Partial<Medication>[]> => {
+export const analyzePrescription = async (input: string, isImage: boolean): Promise<any[]> => {
   try {
     const ai = getAIClient();
     
     // Improved prompt specifically for medical receipts like the one provided
     const prompt = `
         Actúa como un asistente médico experto en lectura de recetas (OCR).
-        Tu tarea es extraer la lista de medicamentos de esta imagen.
+        Tu tarea es extraer la lista de medicamentos y ESTRUCTURAR SUS HORARIOS DE TOMA.
 
         ESTRATEGIA DE LECTURA:
-        1. Busca la sección titulada "TRATAMIENTO" o listas numeradas (1.-, 2.-, etc.).
-        2. Los medicamentos suelen estar en MAYÚSCULAS (ej: GLIBENCLAMIDA, METFORMINA).
-        3. Ignora encabezados administrativos, códigos de barras o pies de página.
-        
-        REGLAS DE EXTRACCIÓN PARA CADA MEDICAMENTO:
-        - name: Nombre del principio activo (ej: Metformina).
-        - dosage: Concentración (ej: 850 mg, 5 mg).
-        - frequency: Frecuencia de toma (ej: "Cada 12 horas", "Antes de cada comida"). Traduce frecuencias numéricas a texto claro.
-        - instructions: Instrucciones completas (ej: "Tomar una tableta con el desayuno").
-        - requiresFood: true si menciona "comida", "alimentos", "desayuno", "cena" o "almuerzo". false si es en ayunas o indiferente.
+        1. Busca medicamentos en secciones "TRATAMIENTO" o listas numeradas.
+        2. ANALIZA LA FRECUENCIA DETALLADAMENTE para llenar los campos de horario.
+
+        REGLAS PARA "scheduleType" y HORARIOS:
+        - Si dice "CADA 24 HORAS" o "1 VEZ AL DÍA": scheduleType="fixed", suggestedTimes=["08:00"].
+        - Si dice "CADA 12 HORAS": scheduleType="fixed", suggestedTimes=["08:00", "20:00"].
+        - Si dice "CADA 8 HORAS": scheduleType="fixed", suggestedTimes=["08:00", "16:00", "23:00"].
+        - Si menciona comidas ("Desayuno", "Comida", "Almuerzo", "Cena"): 
+            - scheduleType="meal_relative".
+            - Llenar "suggestedMeals" con las comidas mencionadas (breakfast, lunch, dinner).
+            - Si dice "Desayuno, Comida y Cena", incluir las 3.
+
+        REGLAS DE EXTRACCIÓN:
+        - name: Nombre del medicamento.
+        - dosage: Concentración (ej: 500 mg).
+        - frequency: Texto original (ej: "Cada 12 horas").
+        - timing: "before" (antes) o "after" (después/con alimentos). Por defecto "after".
         
         CRÍTICO:
         - Devuelve JSON válido.
-        - Escapa correctamente las comillas dobles dentro de los textos.
     `;
 
     let contents: any;
@@ -107,7 +113,7 @@ export const analyzePrescription = async (input: string, isImage: boolean): Prom
       contents: contents,
       config: {
         responseMimeType: "application/json",
-        maxOutputTokens: 8192, // Increased significantly to prevent truncation of long receipts
+        maxOutputTokens: 8192,
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -117,7 +123,10 @@ export const analyzePrescription = async (input: string, isImage: boolean): Prom
               dosage: { type: Type.STRING },
               frequency: { type: Type.STRING },
               instructions: { type: Type.STRING },
-              requiresFood: { type: Type.BOOLEAN }
+              scheduleType: { type: Type.STRING, enum: ["fixed", "meal_relative"] },
+              suggestedTimes: { type: Type.ARRAY, items: { type: Type.STRING } }, // Array ["08:00", "20:00"]
+              suggestedMeals: { type: Type.ARRAY, items: { type: Type.STRING } }, // Array ["breakfast", "dinner"]
+              timing: { type: Type.STRING, enum: ["before", "after"] }
             }
           }
         }

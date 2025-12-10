@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Medication, UserProfile, ScheduleType, MealTrigger, MealTime, MealTiming } from '../types';
 import { analyzePrescription } from '../services/geminiService';
-import { saveProfile, toggleMedicationTaken, resetDailyTracking } from '../services/storageService';
+import { saveProfile, recordMedicationDose, removeLastMedicationDose, resetDailyTracking, deleteMedication } from '../services/storageService';
 
 interface Props {
   profile: UserProfile;
@@ -12,7 +12,7 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
   const [analyzing, setAnalyzing] = useState(false);
   const [manualInput, setManualInput] = useState('');
   
-  // State for manual form
+  // State for manual form (New Medication)
   const [newMed, setNewMed] = useState<{
     name: string;
     dosage: string;
@@ -29,61 +29,29 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
     mealTriggers: []
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // State for Editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Medication | null>(null);
 
-    setAnalyzing(true);
-    const reader = new FileReader();
-    
-    reader.onloadend = async () => {
-      try {
-        const base64 = reader.result as string;
-        const meds = await analyzePrescription(base64, true);
-        
-        if (meds.length === 0) {
-            alert("⚠️ No se detectaron medicamentos.\nIntenta con una imagen más clara, asegúrate que el texto sea legible o ingresa los datos manualmente.");
-        } else {
-            addMedsToProfile(meds);
-            alert(`✅ Éxito: Se detectaron ${meds.length} medicamentos.\nRevisa la lista y ajusta los horarios si es necesario.`);
-        }
-      } catch (error) {
-        console.error("Error analyzing prescription:", error);
-        alert("❌ Ocurrió un error al procesar la imagen.\nPor favor verifica tu conexión a internet o intenta ingresarlo manualmente.");
-      } finally {
-        setAnalyzing(false);
-        e.target.value = '';
-      }
-    };
-    
-    reader.onerror = () => {
-        alert("❌ Error al leer el archivo de imagen.");
-        setAnalyzing(false);
-    };
+  // Helper to calculate progress for a specific med
+  const getDoseProgress = (med: Medication) => {
+    const todayStr = new Date().toDateString();
+    const takenCount = profile.history.filter(h => 
+        h.medName === med.name && 
+        new Date(h.timestamp).toDateString() === todayStr
+    ).length;
 
-    reader.readAsDataURL(file);
-  };
-
-  const handleTextAnalyze = async () => {
-    if (!manualInput) return;
-    setAnalyzing(true);
-    try {
-        const meds = await analyzePrescription(manualInput, false);
-        if (meds.length > 0) {
-            addMedsToProfile(meds);
-        } else {
-            alert("No se pudo extraer información del texto ingresado.");
-        }
-    } catch (error) {
-        console.error(error);
-        alert("Error al analizar el texto.");
-    } finally {
-        setAnalyzing(false);
-        setManualInput('');
+    let targetCount = 1;
+    if (med.scheduleType === 'fixed' && med.fixedTimes) {
+        targetCount = med.fixedTimes.length || 1;
+    } else if (med.scheduleType === 'meal_relative' && med.mealTriggers) {
+        targetCount = med.mealTriggers.length || 1;
     }
+
+    return { taken: takenCount, total: targetCount };
   };
 
-  // Logic to add a time slot
+  // --- Handlers for New Medication Form ---
   const addFixedTime = () => {
       setNewMed(prev => ({ ...prev, fixedTimes: [...prev.fixedTimes, '08:00'] }));
   };
@@ -110,10 +78,126 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
       setNewMed(prev => ({ ...prev, mealTriggers: updated }));
   };
 
+  // --- Handlers for EDIT Medication Form ---
+  const startEditing = (med: Medication) => {
+      setEditingId(med.id);
+      // Create a deep copy for the form to avoid mutating state directly
+      setEditForm({
+          ...med,
+          fixedTimes: med.fixedTimes ? [...med.fixedTimes] : ['08:00'],
+          mealTriggers: med.mealTriggers ? [...med.mealTriggers] : []
+      });
+  };
+
+  const cancelEditing = () => {
+      setEditingId(null);
+      setEditForm(null);
+  };
+
+  const saveEdit = () => {
+      if (!editForm) return;
+
+      // Update frequency text based on new settings
+      let freqText = editForm.frequency;
+      if (editForm.scheduleType === 'fixed' && editForm.fixedTimes) {
+          freqText = `Horas fijas: ${editForm.fixedTimes.join(', ')}`;
+      } else if (editForm.scheduleType === 'meal_relative' && editForm.mealTriggers) {
+          freqText = `Con comidas: ${editForm.mealTriggers.length} dosis`;
+      }
+
+      const finalMed = { ...editForm, frequency: freqText };
+
+      const updatedMeds = profile.medications.map(m => m.id === editingId ? finalMed : m);
+      const updatedProfile = { ...profile, medications: updatedMeds };
+      
+      saveProfile(updatedProfile);
+      onUpdate(updatedProfile);
+      
+      setEditingId(null);
+      setEditForm(null);
+  };
+
+  const addEditFixedTime = () => {
+      if (!editForm) return;
+      setEditForm({ ...editForm, fixedTimes: [...(editForm.fixedTimes || []), '08:00'] });
+  };
+
+  const updateEditFixedTime = (index: number, val: string) => {
+      if (!editForm || !editForm.fixedTimes) return;
+      const updated = [...editForm.fixedTimes];
+      updated[index] = val;
+      setEditForm({ ...editForm, fixedTimes: updated });
+  };
+
+  const removeEditFixedTime = (index: number) => {
+      if (!editForm || !editForm.fixedTimes) return;
+      const updated = editForm.fixedTimes.filter((_, i) => i !== index);
+      setEditForm({ ...editForm, fixedTimes: updated });
+  };
+
+  const toggleEditMealTrigger = (meal: MealTime, timing: MealTiming) => {
+      if (!editForm) return;
+      const triggers = editForm.mealTriggers || [];
+      const exists = triggers.find(t => t.meal === meal && t.timing === timing);
+      let updated;
+      if (exists) {
+          updated = triggers.filter(t => !(t.meal === meal && t.timing === timing));
+      } else {
+          updated = [...triggers, { meal, timing }];
+      }
+      setEditForm({ ...editForm, mealTriggers: updated });
+  };
+
+  // --- Main Logic & Analysis ---
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAnalyzing(true);
+    const reader = new FileReader();
+    
+    reader.onloadend = async () => {
+      try {
+        const base64 = reader.result as string;
+        const meds = await analyzePrescription(base64, true);
+        
+        if (meds.length === 0) {
+            alert("⚠️ No se detectaron medicamentos.\nIntenta con una imagen más clara.");
+        } else {
+            addMedsToProfile(meds);
+            alert(`✅ Éxito: Se detectaron ${meds.length} medicamentos.`);
+        }
+      } catch (error) {
+        console.error("Error analyzing:", error);
+        alert("❌ Ocurrió un error al procesar la imagen.");
+      } finally {
+        setAnalyzing(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleTextAnalyze = async () => {
+    if (!manualInput) return;
+    setAnalyzing(true);
+    try {
+        const meds = await analyzePrescription(manualInput, false);
+        if (meds.length > 0) addMedsToProfile(meds);
+        else alert("No se pudo extraer información.");
+    } catch (error) {
+        console.error(error);
+        alert("Error al analizar el texto.");
+    } finally {
+        setAnalyzing(false);
+        setManualInput('');
+    }
+  };
+
   const handleManualAdd = () => {
     if (!newMed.name) return;
     
-    // Generate Frequency Text
     let freqText = "";
     if (newMed.scheduleType === 'fixed') {
         freqText = `Horas fijas: ${newMed.fixedTimes.join(', ')}`;
@@ -138,42 +222,66 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
     saveProfile(updatedProfile);
     onUpdate(updatedProfile);
     
-    // Reset form
     setNewMed({ 
         name: '', dosage: '', instructions: '', 
         scheduleType: 'fixed', fixedTimes: ['08:00'], mealTriggers: [] 
     });
   };
 
-  const addMedsToProfile = (newMeds: Partial<Medication>[]) => {
-    // Simplified adder for AI results
-    const validMeds: Medication[] = newMeds.map(m => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: m.name || 'Desconocido',
-      dosage: m.dosage || 'Según receta',
-      frequency: m.frequency || 'Diario',
-      instructions: m.instructions || '',
-      requiresFood: m.requiresFood || false,
-      takenToday: false,
-      scheduleType: 'fixed',
-      fixedTimes: ['08:00']
-    }));
+  const addMedsToProfile = (newMeds: any[]) => {
+    const validMeds: Medication[] = newMeds.map(m => {
+        let scheduleType: ScheduleType = 'fixed';
+        let fixedTimes: string[] = ['08:00'];
+        let mealTriggers: MealTrigger[] = [];
+        let requiresFood = false;
+
+        if (m.scheduleType === 'meal_relative' && m.suggestedMeals && m.suggestedMeals.length > 0) {
+            scheduleType = 'meal_relative';
+            const timing = (m.timing === 'before') ? 'before' : 'after';
+            mealTriggers = m.suggestedMeals.map((mealName: string) => ({
+                meal: mealName as MealTime, 
+                timing: timing
+            }));
+            requiresFood = true;
+        } else {
+            scheduleType = 'fixed';
+            if (m.suggestedTimes && m.suggestedTimes.length > 0) {
+                fixedTimes = m.suggestedTimes;
+            }
+        }
+
+        return {
+            id: Math.random().toString(36).substr(2, 9),
+            name: m.name || 'Desconocido',
+            dosage: m.dosage || 'Según receta',
+            frequency: m.frequency || (scheduleType === 'fixed' ? `Horas: ${fixedTimes.join(', ')}` : 'Con comidas'),
+            instructions: m.instructions || '',
+            requiresFood: requiresFood,
+            takenToday: false,
+            scheduleType: scheduleType,
+            fixedTimes: scheduleType === 'fixed' ? fixedTimes : undefined,
+            mealTriggers: scheduleType === 'meal_relative' ? mealTriggers : undefined
+        };
+    });
 
     const updatedProfile = { ...profile, medications: [...profile.medications, ...validMeds] };
     saveProfile(updatedProfile);
     onUpdate(updatedProfile);
   };
 
-  const handleToggleTaken = (id: string) => {
-    const updatedProfile = toggleMedicationTaken(id);
+  const handleTakeDose = (id: string) => {
+    const updatedProfile = recordMedicationDose(id);
+    onUpdate(updatedProfile);
+  };
+
+  const handleUndoDose = (id: string) => {
+    const updatedProfile = removeLastMedicationDose(id);
     onUpdate(updatedProfile);
   };
 
   const removeMed = (id: string) => {
-    if(!window.confirm("¿Estás seguro de que quieres eliminar este medicamento?")) return;
-    const updatedMeds = profile.medications.filter(m => m.id !== id);
-    const updatedProfile = { ...profile, medications: updatedMeds };
-    saveProfile(updatedProfile);
+    if(!window.confirm("¿Estás seguro de que quieres eliminar este medicamento del tratamiento?")) return;
+    const updatedProfile = deleteMedication(id);
     onUpdate(updatedProfile);
   };
 
@@ -202,7 +310,7 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
         </div>
       </div>
 
-      {/* Manual Add Form - UPDATED */}
+      {/* Manual Add Form */}
       <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 mb-8">
         <h3 className="font-semibold text-gray-800 mb-4">📝 Registrar Nuevo Medicamento</h3>
         
@@ -342,13 +450,101 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
              <p className="text-gray-500">No tienes medicamentos registrados.</p>
           </div>
         ) : (
-          profile.medications.map(med => (
-            <div key={med.id} className={`relative overflow-hidden group transition-all duration-300 ${med.takenToday ? 'opacity-70 grayscale-[0.5]' : ''}`}>
-              <div className={`flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border shadow-sm ${med.takenToday ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 hover:border-teal-200 hover:shadow-md'}`}>
+          profile.medications.map(med => {
+            
+            // --- EDIT MODE VIEW ---
+            if (editingId === med.id && editForm) {
+                return (
+                    <div key={med.id} className="bg-teal-50 border-2 border-teal-300 p-5 rounded-xl shadow-md">
+                        <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-bold text-teal-800">✏️ Editando: {med.name}</h4>
+                            <div className="flex gap-2">
+                                <button onClick={saveEdit} className="bg-teal-600 text-white px-3 py-1 rounded text-sm font-bold hover:bg-teal-700">Guardar</button>
+                                <button onClick={cancelEditing} className="bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-400">Cancelar</button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="text-xs font-bold text-gray-500">Nombre</label>
+                                <input className="w-full border rounded p-2" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-500">Dosis</label>
+                                <input className="w-full border rounded p-2" value={editForm.dosage} onChange={e => setEditForm({...editForm, dosage: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="text-xs font-bold text-gray-500 block mb-2">Tipo de Horario</label>
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" checked={editForm.scheduleType === 'fixed'} onChange={() => setEditForm({...editForm, scheduleType: 'fixed', fixedTimes: editForm.fixedTimes || ['08:00']})} />
+                                    <span className="text-sm">⏰ Hora Fija</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" checked={editForm.scheduleType === 'meal_relative'} onChange={() => setEditForm({...editForm, scheduleType: 'meal_relative', mealTriggers: editForm.mealTriggers || []})} />
+                                    <span className="text-sm">🍽️ Comidas</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {editForm.scheduleType === 'fixed' ? (
+                            <div>
+                                <div className="flex justify-between mb-2">
+                                    <label className="text-xs font-bold text-gray-500">Horarios:</label>
+                                    <button onClick={addEditFixedTime} className="text-xs text-teal-600 font-bold">+ Agregar Hora</button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {editForm.fixedTimes?.map((t, i) => (
+                                        <div key={i} className="flex items-center gap-1">
+                                            <input type="time" className="border rounded p-1 text-sm" value={t} onChange={e => updateEditFixedTime(i, e.target.value)} />
+                                            <button onClick={() => removeEditFixedTime(i)} className="text-red-500 font-bold px-1">×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                             <div>
+                                <label className="text-xs font-bold text-gray-500 block mb-2">Disparadores:</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {['breakfast', 'lunch', 'dinner'].map((meal) => (
+                                        <div key={meal} className="border bg-white rounded p-2 text-center">
+                                            <div className="text-xs font-bold capitalize mb-1">{meal === 'breakfast' ? 'Desayuno' : meal === 'lunch' ? 'Almuerzo' : 'Cena'}</div>
+                                            <div className="flex justify-center gap-1">
+                                                <button 
+                                                    onClick={() => toggleEditMealTrigger(meal as MealTime, 'before')}
+                                                    className={`text-[10px] px-1 py-0.5 rounded ${editForm.mealTriggers?.find(t => t.meal === meal && t.timing === 'before') ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}
+                                                >
+                                                    Antes
+                                                </button>
+                                                <button 
+                                                    onClick={() => toggleEditMealTrigger(meal as MealTime, 'after')}
+                                                    className={`text-[10px] px-1 py-0.5 rounded ${editForm.mealTriggers?.find(t => t.meal === meal && t.timing === 'after') ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                                >
+                                                    Después
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // --- STANDARD VIEW ---
+            const { taken, total } = getDoseProgress(med);
+            const isCompleted = taken >= total;
+
+            return (
+            <div key={med.id} className={`relative overflow-hidden group transition-all duration-300 ${isCompleted ? 'opacity-70' : ''}`}>
+              <div className={`flex flex-col md:flex-row md:items-center justify-between p-5 rounded-xl border shadow-sm ${isCompleted ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 hover:border-teal-200 hover:shadow-md'}`}>
                 
                 <div className="flex-1 mb-4 md:mb-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className={`font-bold text-xl ${med.takenToday ? 'text-green-800 line-through' : 'text-gray-800'}`}>{med.name}</h4>
+                    <h4 className={`font-bold text-xl ${isCompleted ? 'text-green-800 line-through' : 'text-gray-800'}`}>{med.name}</h4>
                     {/* Schedule Badge */}
                     <span className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 ${med.scheduleType === 'fixed' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
                         {med.scheduleType === 'fixed' ? '⏰ Fijo' : '🍽️ Comidas'}
@@ -356,6 +552,16 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
                   </div>
                   <p className="text-sm text-gray-600 font-medium">{med.dosage}</p>
                   
+                  {/* Progress Indicator */}
+                  <div className="mt-3 flex items-center gap-3">
+                      <div className="flex gap-1">
+                          {Array.from({ length: total }).map((_, i) => (
+                              <div key={i} className={`w-3 h-3 rounded-full border ${i < taken ? 'bg-green-500 border-green-600' : 'bg-gray-100 border-gray-300'}`}></div>
+                          ))}
+                      </div>
+                      <span className="text-xs font-bold text-gray-500">{taken}/{total} Dosis</span>
+                  </div>
+
                   {/* Visual Schedule Details */}
                   <div className="mt-2 flex flex-wrap gap-2">
                       {med.scheduleType === 'fixed' && med.fixedTimes?.map(t => (
@@ -371,26 +577,42 @@ const MedicationManager: React.FC<Props> = ({ profile, onUpdate }) => {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => handleToggleTaken(med.id)}
-                    className={`flex-1 md:flex-none px-6 py-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 justify-center ${
-                        med.takenToday 
-                        ? 'bg-green-100 text-green-700 ring-2 ring-green-200' 
-                        : 'bg-teal-600 text-white hover:bg-teal-700 shadow-md hover:shadow-lg active:scale-95'
-                    }`}
-                  >
-                    {med.takenToday ? (
-                        <><span>✔️</span> Completado</>
-                    ) : (
-                        <><span>⭕</span> Tomado</>
-                    )}
-                  </button>
-                  <button onClick={() => removeMed(med.id)} className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition" title="Eliminar">🗑️</button>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    <button 
+                        onClick={() => handleTakeDose(med.id)}
+                        disabled={isCompleted}
+                        className={`flex-1 md:flex-none px-4 py-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 justify-center min-w-[140px] ${
+                            isCompleted
+                            ? 'bg-green-100 text-green-700 ring-2 ring-green-200 cursor-default' 
+                            : 'bg-teal-600 text-white hover:bg-teal-700 shadow-md hover:shadow-lg active:scale-95'
+                        }`}
+                    >
+                        {isCompleted ? (
+                            <><span>✔️</span> Completado</>
+                        ) : (
+                            <><span>💊</span> Tomar ({taken + 1}/{total})</>
+                        )}
+                    </button>
+                    {/* Edit Button */}
+                    <button onClick={() => startEditing(med)} className="p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Editar Medicamento">✏️</button>
+                    {/* Delete Button */}
+                    <button onClick={() => removeMed(med.id)} className="p-3 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Eliminar Medicamento">🗑️</button>
+                  </div>
+                  
+                  {taken > 0 && (
+                      <button 
+                        onClick={() => handleUndoDose(med.id)}
+                        className="text-xs text-red-400 hover:text-red-600 hover:underline px-2"
+                      >
+                          ↩ Deshacer última toma
+                      </button>
+                  )}
                 </div>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
