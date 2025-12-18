@@ -2,10 +2,10 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { UserProfile, Meal, ExerciseRoutine, Medication } from "../types";
 
-// Always initialize with process.env.API_KEY using a named parameter.
+// Inicialización con la API KEY del entorno
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
-// Helper to handle retries with exponential backoff for rate limiting
+// Helper para reintentos en caso de cuota excedida
 const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promise<T> => {
     try {
         return await fn();
@@ -18,7 +18,7 @@ const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promis
     }
 };
 
-// Compresses base64 images to optimize storage and API payload size
+// Comprime las imágenes Base64 para no saturar el almacenamiento local/DB
 const compressBase64Image = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
         try {
@@ -47,72 +47,115 @@ const compressBase64Image = (base64Str: string): Promise<string> => {
     });
 };
 
-// Fixes Error in file services/geminiService.ts on line 76: Property 'text' does not exist on type 'unknown'.
 export const analyzePrescription = async (input: string, isImage: boolean): Promise<any[]> => {
-    const prompt = `Analiza la receta médica. Reglas: Si es cada 8h: ["08:00", "16:00", "23:00"]. Devuelve JSON válido.`;
+    const prompt = `Analiza la receta médica. Extrae medicamentos. Si es cada 8h usa ["08:00", "16:00", "23:00"]. Devuelve JSON Array.`;
     let contents = isImage 
         ? { parts: [{ inlineData: { mimeType: 'image/png', data: input.split(',')[1] } }, { text: prompt }] } 
         : { parts: [{ text: `${input}. ${prompt}` }] };
     
-    // Explicitly typing response to GenerateContentResponse to fix 'unknown' error
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: contents,
-      config: { responseMimeType: "application/json" }
+      config: { 
+          responseMimeType: "application/json",
+          responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                  type: Type.OBJECT,
+                  properties: {
+                      name: { type: Type.STRING },
+                      dosage: { type: Type.STRING },
+                      frequency: { type: Type.STRING },
+                      scheduleType: { type: Type.STRING },
+                      suggestedTimes: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  }
+              }
+          }
+      }
     }));
     return JSON.parse(response.text || "[]");
 };
 
-// Fixes Error in file services/geminiService.ts on line 86: Property 'text' does not exist on type 'unknown'.
 export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[]> => {
-    // Explicitly typing response to GenerateContentResponse to fix 'unknown' error
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Plan de 1 día para: ${profile.diagnoses.join(', ')}. Evitar: ${profile.forbiddenFoods.join(', ')}. JSON format.`,
-      config: { responseMimeType: "application/json" }
+      contents: `Genera un plan de comidas (Desayuno, Almuerzo, Cena, Snack) para un paciente con: ${profile.diagnoses.join(', ')}. Evitar: ${profile.forbiddenFoods.join(', ')}. Objetivo: ${profile.goals}.`,
+      config: { 
+          responseMimeType: "application/json",
+          responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                  type: Type.OBJECT,
+                  properties: {
+                      name: { type: Type.STRING },
+                      description: { type: Type.STRING },
+                      ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      calories: { type: Type.NUMBER },
+                      glycemicIndex: { type: Type.STRING },
+                      suitableFor: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  }
+              }
+          }
+      }
     }));
-    return JSON.parse(response.text || "[]");
+    const data = JSON.parse(response.text || "[]");
+    return Array.isArray(data) ? data : [];
 };
 
-// Fixes Error in file services/geminiService.ts on line 96: Property 'candidates' does not exist on type 'unknown'.
 export const generateMealImage = async (mealDescription: string): Promise<string | null> => {
   try {
-      // Explicitly typing response to GenerateContentResponse and using correct model for image generation
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
-        contents: { parts: [{ text: `Healthy food photo: ${mealDescription}` }] }
+        contents: { parts: [{ text: `High quality food photography: ${mealDescription}` }] }
       }));
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       return part?.inlineData ? await compressBase64Image(part.inlineData.data) : null;
   } catch (error) {
-      console.error("Meal image generation error:", error);
       return `https://placehold.co/600x400/e2e8f0/475569?text=Comida`;
   }
 };
 
-// Fixes Error in file services/geminiService.ts on line 110: Property 'candidates' does not exist on type 'unknown'.
 export const generateExerciseImage = async (exerciseName: string): Promise<string | null> => {
   try {
-      // Explicitly typing response to GenerateContentResponse and using correct model for image generation
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
-        contents: { parts: [{ text: `Action photo of a person performing ${exerciseName}, white background, professional fitness photography.` }] }
+        contents: { parts: [{ text: `Person doing exercise: ${exerciseName}, clean fitness environment, illustrative style.` }] }
       }));
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       return part?.inlineData ? await compressBase64Image(part.inlineData.data) : null;
   } catch (error) {
-      console.error("Exercise image generation error:", error);
       return `https://placehold.co/400x400/f8fafc/ea580c?text=${encodeURIComponent(exerciseName)}`;
   }
 };
 
-// Fixes Error in file services/geminiService.ts on line 124: Property 'text' does not exist on type 'unknown'.
 export const generateExerciseRoutine = async (profile: UserProfile): Promise<ExerciseRoutine | null> => {
-    // Explicitly typing response to GenerateContentResponse to fix 'unknown' error
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Rutina para ${profile.age} años con ${profile.diagnoses.join(', ')}. Nivel: ${profile.activityLevel}. JSON format.`,
-      config: { responseMimeType: "application/json" }
+      contents: `Rutina de ejercicios para ${profile.age} años con ${profile.diagnoses.join(', ')}. Nivel: ${profile.activityLevel}.`,
+      config: { 
+          responseMimeType: "application/json",
+          responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  durationMinutes: { type: Type.NUMBER },
+                  intensity: { type: Type.STRING },
+                  exercises: {
+                      type: Type.ARRAY,
+                      items: {
+                          type: Type.OBJECT,
+                          properties: {
+                              name: { type: Type.STRING },
+                              reps: { type: Type.STRING },
+                              tips: { type: Type.STRING }
+                          }
+                      }
+                  },
+                  safetyNotes: { type: Type.STRING }
+              }
+          }
+      }
     }));
     return JSON.parse(response.text || "null");
 };
