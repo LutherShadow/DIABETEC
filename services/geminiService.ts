@@ -2,10 +2,9 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { UserProfile, Meal, ExerciseRoutine, Medication } from "../types";
 
-// Inicialización con la API KEY del entorno
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+// Helper para instanciar la IA justo antes de usarla, asegurando que tenga la API KEY actualizada
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
-// Helper para reintentos en caso de cuota excedida
 const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promise<T> => {
     try {
         return await fn();
@@ -18,7 +17,6 @@ const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promis
     }
 };
 
-// Comprime las imágenes Base64 para no saturar el almacenamiento local/DB
 const compressBase64Image = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
         try {
@@ -48,6 +46,7 @@ const compressBase64Image = (base64Str: string): Promise<string> => {
 };
 
 export const analyzePrescription = async (input: string, isImage: boolean): Promise<any[]> => {
+    const ai = getAI();
     const prompt = `Analiza la receta médica. Extrae medicamentos. Si es cada 8h usa ["08:00", "16:00", "23:00"]. Devuelve JSON Array.`;
     let contents = isImage 
         ? { parts: [{ inlineData: { mimeType: 'image/png', data: input.split(',')[1] } }, { text: prompt }] } 
@@ -77,6 +76,7 @@ export const analyzePrescription = async (input: string, isImage: boolean): Prom
 };
 
 export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[]> => {
+    const ai = getAI();
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Genera un plan de comidas (Desayuno, Almuerzo, Cena, Snack) para un paciente con: ${profile.diagnoses.join(', ')}. Evitar: ${profile.forbiddenFoods.join(', ')}. Objetivo: ${profile.goals}.`,
@@ -103,6 +103,7 @@ export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[
 };
 
 export const generateMealImage = async (mealDescription: string): Promise<string | null> => {
+  const ai = getAI();
   try {
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
@@ -116,6 +117,7 @@ export const generateMealImage = async (mealDescription: string): Promise<string
 };
 
 export const generateExerciseImage = async (exerciseName: string): Promise<string | null> => {
+  const ai = getAI();
   try {
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
@@ -129,6 +131,7 @@ export const generateExerciseImage = async (exerciseName: string): Promise<strin
 };
 
 export const generateExerciseRoutine = async (profile: UserProfile): Promise<ExerciseRoutine | null> => {
+    const ai = getAI();
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Rutina de ejercicios para ${profile.age} años con ${profile.diagnoses.join(', ')}. Nivel: ${profile.activityLevel}.`,

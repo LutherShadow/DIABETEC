@@ -15,9 +15,16 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'info'|'alert'} | null>(null);
   const sentNotifications = useRef<Set<string>>(new Set());
+  const [hasKey, setHasKey] = useState<boolean>(true);
 
   useEffect(() => {
     const init = async () => {
+        // Verificar si se requiere selección de llave para modelos avanzados de imagen
+        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
+            const keySelected = await window.aistudio.hasSelectedApiKey();
+            setHasKey(keySelected);
+        }
+
         const loadedProfile = await initializeData();
         setProfile(loadedProfile);
         if (loadedProfile.onboardingComplete) setView('dashboard');
@@ -25,6 +32,13 @@ const App: React.FC = () => {
     };
     init();
   }, []);
+
+  const handleSelectKey = async () => {
+      if (window.aistudio && window.aistudio.openSelectKey) {
+          await window.aistudio.openSelectKey();
+          setHasKey(true);
+      }
+  };
 
   // --- GLOBAL ALERT SYSTEM ---
   useEffect(() => {
@@ -86,7 +100,23 @@ const App: React.FC = () => {
       sentNotifications.current.clear();
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-teal-600 font-bold">Iniciando VidaSalud AI...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-teal-600 font-bold italic">Iniciando VidaSalud AI...</div>;
+
+  // Pantalla de selección de llave si es requerida
+  if (!hasKey) {
+      return (
+          <div className="min-h-screen bg-teal-900 flex items-center justify-center p-6 text-center">
+              <div className="max-w-md bg-white p-8 rounded-2xl shadow-2xl">
+                  <div className="text-5xl mb-4">🔑</div>
+                  <h1 className="text-2xl font-bold text-gray-800 mb-2">Configuración Necesaria</h1>
+                  <p className="text-gray-600 mb-6 text-sm">Para generar imágenes y planes de salud avanzados, debes seleccionar tu propia clave de API.</p>
+                  <button onClick={handleSelectKey} className="w-full bg-teal-600 text-white py-3 rounded-xl font-bold hover:bg-teal-700 transition shadow-lg">Seleccionar API Key</button>
+                  <p className="mt-4 text-xs text-gray-400">Consulta la <a href="https://ai.google.dev/gemini-api/docs/billing" className="underline" target="_blank">documentación de facturación</a> si tienes dudas.</p>
+              </div>
+          </div>
+      );
+  }
+
   if (view === 'login') return <Login onSuccess={() => { setProfile(getProfile()); setView('dashboard'); }} onBack={() => setView('onboarding')} />;
   if (!profile || !profile.onboardingComplete) return <Onboarding onComplete={() => { setProfile(getProfile()); setView('dashboard'); }} onLoginClick={() => setView('login')} />;
 
@@ -115,7 +145,7 @@ const App: React.FC = () => {
         {view === 'dashboard' && <Dashboard profile={profile} onChangeView={setView} />}
         {view === 'medications' && <MedicationManager profile={profile} onUpdate={handleProfileUpdate} />}
         {view === 'meals' && <MealPlanner profile={profile} onUpdate={handleProfileUpdate} />}
-        {view === 'exercise' && <ExerciseCoach profile={profile} />}
+        {view === 'exercise' && <ExerciseCoach profile={profile} onUpdate={handleProfileUpdate} />}
       </main>
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-3 z-50 shadow-lg">
