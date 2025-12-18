@@ -42,7 +42,6 @@ const App: React.FC = () => {
                     const scheduledTotalMinutes = h * 60 + m;
                     const diff = currentTotalMinutes - scheduledTotalMinutes;
 
-                    // 1. PRE-REMINDER (10 minutes before)
                     if (diff >= -11 && diff <= -9) {
                         const preKey = `pre-${med.id}-${timeStr}-${todayStr}`;
                         if (!sentNotifications.current.has(preKey)) {
@@ -51,7 +50,6 @@ const App: React.FC = () => {
                         }
                     }
 
-                    // 2. ACTUAL REMINDER (On time)
                     if (diff >= 0 && diff <= 2) {
                         const notifKey = `${med.id}-${timeStr}-${todayStr}`;
                         if (!sentNotifications.current.has(notifKey)) {
@@ -72,7 +70,7 @@ const App: React.FC = () => {
         setTimeout(() => setToast(null), 10000);
     };
 
-    const interval = setInterval(checkMedications, 30000); // Check every 30s
+    const interval = setInterval(checkMedications, 30000); 
     return () => clearInterval(interval);
   }, [profile]);
 
@@ -116,7 +114,7 @@ const App: React.FC = () => {
       <main className="flex-1 max-w-5xl mx-auto w-full pb-24 md:pb-8 md:pt-8 px-4">
         {view === 'dashboard' && <Dashboard profile={profile} onChangeView={setView} />}
         {view === 'medications' && <MedicationManager profile={profile} onUpdate={handleProfileUpdate} />}
-        {view === 'meals' && <MealPlanner profile={profile} />}
+        {view === 'meals' && <MealPlanner profile={profile} onUpdate={handleProfileUpdate} />}
         {view === 'exercise' && <ExerciseCoach profile={profile} />}
       </main>
 

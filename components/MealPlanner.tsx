@@ -2,37 +2,31 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, Meal } from '../types';
 import { generateDailyMealPlan, generateMealImage } from '../services/geminiService';
-import { saveProfile } from '../services/storageService';
 
 interface Props {
   profile: UserProfile;
+  onUpdate: (profile: UserProfile) => void;
 }
 
-const MealPlanner: React.FC<Props> = ({ profile }) => {
-  // Inicializamos con el plan guardado en el perfil si existe
-  const [meals, setMeals] = useState<Meal[]>(Array.isArray(profile.mealPlan) ? profile.mealPlan : []);
+const MealPlanner: React.FC<Props> = ({ profile, onUpdate }) => {
+  // Siempre usamos el estado del perfil como fuente de verdad
   const [loading, setLoading] = useState(false);
   const [generatingImageFor, setGeneratingImageFor] = useState<string | null>(null);
-
-  // Sincronizar estado local con el perfil si este cambia externamente
-  useEffect(() => {
-    if (profile.mealPlan && Array.isArray(profile.mealPlan) && profile.mealPlan.length > 0 && meals.length === 0) {
-      setMeals(profile.mealPlan);
-    }
-  }, [profile.mealPlan]);
+  
+  // Obtenemos los platos actuales del perfil (asegurando que sea un array)
+  const currentMeals = Array.isArray(profile.mealPlan) ? profile.mealPlan : [];
 
   const handleGenerate = async () => {
-    if (meals.length > 0 && !window.confirm("¿Quieres generar un nuevo menú? Se perderá el actual.")) return;
+    if (currentMeals.length > 0 && !window.confirm("¿Quieres generar un nuevo menú? Se perderá el actual.")) return;
     
     setLoading(true);
     try {
         const plan = await generateDailyMealPlan(profile);
         const validPlan = Array.isArray(plan) ? plan : [];
         
-        // Guardar inmediatamente
-        setMeals(validPlan);
+        // Actualizamos el perfil global
         const updatedProfile = { ...profile, mealPlan: validPlan };
-        saveProfile(updatedProfile);
+        onUpdate(updatedProfile);
         
     } catch (error) {
         console.error("Error generating meals", error);
@@ -47,13 +41,12 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
       try {
           const imageUrl = await generateMealImage(`${mealName}: ${description}`);
           if (imageUrl) {
-              const newMeals = [...meals];
-              newMeals[index].imageUrl = imageUrl;
-              setMeals(newMeals);
+              const newMeals = [...currentMeals];
+              newMeals[index] = { ...newMeals[index], imageUrl };
               
-              // Persistir el cambio de la imagen en el perfil
+              // Persistir el cambio de la imagen en el perfil global
               const updatedProfile = { ...profile, mealPlan: newMeals };
-              saveProfile(updatedProfile);
+              onUpdate(updatedProfile);
           }
       } catch (e) {
           console.error("Error loading image", e);
@@ -64,8 +57,8 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
 
   const clearMenu = () => {
     if (window.confirm("¿Eliminar el menú actual?")) {
-        setMeals([]);
-        saveProfile({ ...profile, mealPlan: [] });
+        const updatedProfile = { ...profile, mealPlan: [] };
+        onUpdate(updatedProfile);
     }
   };
 
@@ -79,7 +72,7 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
             <p className="text-gray-500 text-sm">Menú personalizado basado en tu perfil médico.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
-            {meals.length > 0 && (
+            {currentMeals.length > 0 && (
                 <button 
                     onClick={clearMenu}
                     className="flex-1 md:flex-none border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50"
@@ -92,19 +85,19 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
                 disabled={loading}
                 className="flex-1 md:flex-none bg-teal-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 shadow-sm transition-all"
             >
-                {loading ? 'Consultando IA...' : (meals.length > 0 ? '🔄 Nuevo Menú' : '✨ Generar Menú')}
+                {loading ? 'Consultando IA...' : (currentMeals.length > 0 ? '🔄 Nuevo Menú' : '✨ Generar Menú')}
             </button>
         </div>
       </div>
 
       {loading && (
-        <div className="py-20 text-center">
+        <div className="py-20 text-center animate-fade-in">
            <div className="inline-block animate-spin text-4xl mb-4">🍳</div>
            <p className="text-teal-600 font-medium animate-pulse">Analizando tus necesidades nutricionales...</p>
         </div>
       )}
 
-      {!loading && meals.length === 0 && (
+      {!loading && currentMeals.length === 0 && (
           <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
               <div className="text-5xl mb-4">🍽️</div>
               <h3 className="text-lg font-bold text-gray-700">Aún no hay un plan activo</h3>
@@ -113,7 +106,7 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {meals.map((meal, idx) => (
+        {currentMeals.map((meal, idx) => (
           <div key={idx} className="border border-gray-100 rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 bg-white flex flex-col border-b-4 border-b-teal-500">
             <div className="bg-teal-50/50 p-4 border-b border-teal-100 flex justify-between items-start">
                <div className="flex-1">
@@ -179,7 +172,7 @@ const MealPlanner: React.FC<Props> = ({ profile }) => {
         ))}
       </div>
       
-      {meals.length > 0 && (
+      {currentMeals.length > 0 && (
           <div className="mt-8 p-4 bg-teal-50 rounded-xl border border-teal-100 text-center">
               <p className="text-xs text-teal-700">💡 <b>Tip de Salud:</b> Este menú ha sido guardado automáticamente en tu perfil y en la nube.</p>
           </div>
