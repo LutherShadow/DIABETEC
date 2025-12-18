@@ -12,23 +12,21 @@ export interface Medication {
   id: string;
   name: string;
   dosage: string;
-  frequency: string; // Text description e.g. "Cada 12 horas"
+  frequency: string; 
   instructions: string; 
   takenToday: boolean;
   requiresFood?: boolean;
-  
-  // New Scheduling Fields
   scheduleType: ScheduleType;
-  fixedTimes?: string[]; // Array of "HH:MM" for fixed schedules
-  mealTriggers?: MealTrigger[]; // For meal-relative schedules
+  fixedTimes?: string[]; 
+  mealTriggers?: MealTrigger[]; 
 }
 
 export interface MedicationLog {
   id: string;
   medName: string;
-  timestamp: string; // ISO Date string
-  formattedDate: string; // Displayable string
-  context?: string; // e.g. "Scheduled: 08:00" or "Before Lunch"
+  timestamp: string; 
+  formattedDate: string; 
+  context?: string; 
   status: 'taken' | 'skipped';
 }
 
@@ -38,7 +36,7 @@ export interface Meal {
   ingredients: string[];
   calories: number;
   glycemicIndex: 'Low' | 'Medium' | 'High';
-  suitableFor: string[]; // e.g., "Breakfast", "Lunch"
+  suitableFor: string[]; 
   imageUrl?: string;
 }
 
@@ -47,26 +45,27 @@ export interface ExerciseRoutine {
   durationMinutes: number;
   intensity: 'Low' | 'Medium' | 'High';
   description: string;
-  medicalTip?: string; // New: Specific medical advice (e.g., walking for diabetes)
+  medicalTip?: string; 
   exercises: { 
     name: string; 
     reps: string; 
     duration?: string;
-    visualDescription?: string; // New: For generating placeholder images/gifs
-    tips?: string; // New: Technique tips
+    visualDescription?: string; 
+    tips?: string; 
+    imageUrl?: string; // Nuevo campo para persistencia de imagen
   }[];
   safetyNotes: string;
 }
 
 export interface UserProfile {
-  id?: string; // Add ID field to track email/user-id
+  id?: string; 
   name: string;
   age: number;
   gender: 'male' | 'female' | 'other';
-  height: number; // cm
-  weight: number; // kg
+  height: number; 
+  weight: number; 
   activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'athlete';
-  diagnoses: string[]; // e.g., "Diabetes Type 2"
+  diagnoses: string[]; 
   allowedFoods: string[];
   forbiddenFoods: string[];
   allergies: string[];
@@ -74,8 +73,6 @@ export interface UserProfile {
   medications: Medication[];
   history: MedicationLog[]; 
   onboardingComplete: boolean;
-  
-  // Persisted Generated Content
   mealPlan?: Meal[];
   exerciseRoutine?: ExerciseRoutine | null;
 }
