@@ -40,21 +40,33 @@ export interface Meal {
   imageUrl?: string;
 }
 
+export interface Exercise {
+  id: string;
+  name: string; 
+  reps: string; 
+  sets?: number;
+  repsPerSet?: string;
+  duration?: string;
+  visualDescription?: string; 
+  tips?: string; 
+  benefits?: string;
+  medicalReasoning?: string; // Por qué este ejercicio es bueno para TU diagnóstico
+  medicalCaution?: string;
+  imageUrl?: string;
+  completed?: boolean;
+  scheduledDay?: number; // 0-6
+  isAdapted?: boolean; // Indica si la IA lo modificó para el usuario
+}
+
 export interface ExerciseRoutine {
   title: string;
   durationMinutes: number;
   intensity: 'Low' | 'Medium' | 'High';
   description: string;
   medicalTip?: string; 
-  exercises: { 
-    name: string; 
-    reps: string; 
-    duration?: string;
-    visualDescription?: string; 
-    tips?: string; 
-    imageUrl?: string; // Nuevo campo para persistencia de imagen
-  }[];
+  exercises: Exercise[];
   safetyNotes: string;
+  originalMethod?: string; // Ej: "One Punch Man", "Darebee Main Character"
 }
 
 export interface UserProfile {

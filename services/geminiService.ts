@@ -1,8 +1,7 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { UserProfile, Meal, ExerciseRoutine, Medication } from "../types";
+import { UserProfile, Meal, ExerciseRoutine, Exercise } from "../types";
 
-// Helper para instanciar la IA justo antes de usarla, asegurando que tenga la API KEY actualizada
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
 const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promise<T> => {
@@ -45,41 +44,86 @@ const compressBase64Image = (base64Str: string): Promise<string> => {
     });
 };
 
-export const analyzePrescription = async (input: string, isImage: boolean): Promise<any[]> => {
+export const analyzeAndAdaptRoutine = async (
+    content: string, 
+    profile: UserProfile, 
+    isImage: boolean, 
+    existingRoutine?: ExerciseRoutine | null
+): Promise<ExerciseRoutine | null> => {
     const ai = getAI();
-    const prompt = `Analiza la receta médica. Extrae medicamentos. Si es cada 8h usa ["08:00", "16:00", "23:00"]. Devuelve JSON Array.`;
-    let contents = isImage 
-        ? { parts: [{ inlineData: { mimeType: 'image/png', data: input.split(',')[1] } }, { text: prompt }] } 
-        : { parts: [{ text: `${input}. ${prompt}` }] };
+    let systemPrompt = `Eres un Médico Fisioterapeuta y Entrenador de Élite. 
+    TAREA: Analiza la nueva rutina adjunta (ej: Darebee, One Punch Man, etc.).
+    PERFIL MÉDICO: El usuario tiene ${profile.diagnoses.join(', ')}.
     
+    REGLAS CRÍTICAS:
+    1. FRACCIONAMIENTO: Si detectas volúmenes altos (ej: 100 flexiones), DIVIDELOS en series manejables (ej: 5 series de 20) con descanso.
+    2. SEGURIDAD: Adapta ejercicios de alto impacto a versiones seguras para sus patologías.
+    3. CALENDARIO: Distribuye en 0-6 (Dom-Sab).
+    4. REZONAMIENTO: Explica en 'medicalReasoning' el beneficio para su condición específica.`;
+
+    if (existingRoutine) {
+        systemPrompt += `
+        MODO COMBINAR: El usuario YA TIENE una rutina: "${existingRoutine.title}". 
+        INTEGRA los nuevos ejercicios con los existentes. 
+        - Si hay ejercicios similares, suma el volumen o mantén la versión más segura. 
+        - NO dupliques ejercicios.
+        - Asegúrate de que el tiempo total diario no exceda los 45-60 minutos.`;
+    }
+
+    let parts: any[] = [{ text: systemPrompt }];
+    if (isImage) {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: content.split(',')[1] } });
+    } else {
+        parts.push({ text: `Nueva rutina a procesar: ${content}` });
+    }
+
+    if (existingRoutine) {
+        parts.push({ text: `Rutina actual para combinar: ${JSON.stringify(existingRoutine)}` });
+    }
+
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: contents,
+      contents: { parts },
       config: { 
           responseMimeType: "application/json",
           responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                  type: Type.OBJECT,
-                  properties: {
-                      name: { type: Type.STRING },
-                      dosage: { type: Type.STRING },
-                      frequency: { type: Type.STRING },
-                      scheduleType: { type: Type.STRING },
-                      suggestedTimes: { type: Type.ARRAY, items: { type: Type.STRING } }
-                  }
+              type: Type.OBJECT,
+              properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  intensity: { type: Type.STRING },
+                  originalMethod: { type: Type.STRING },
+                  exercises: {
+                      type: Type.ARRAY,
+                      items: {
+                          type: Type.OBJECT,
+                          properties: {
+                              id: { type: Type.STRING },
+                              name: { type: Type.STRING },
+                              sets: { type: Type.NUMBER },
+                              repsPerSet: { type: Type.STRING },
+                              reps: { type: Type.STRING },
+                              tips: { type: Type.STRING },
+                              benefits: { type: Type.STRING },
+                              medicalReasoning: { type: Type.STRING },
+                              medicalCaution: { type: Type.STRING },
+                              scheduledDay: { type: Type.NUMBER }
+                          }
+                      }
+                  },
+                  safetyNotes: { type: Type.STRING }
               }
           }
       }
     }));
-    return JSON.parse(response.text || "[]");
+    return JSON.parse(response.text || "null");
 };
 
 export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[]> => {
     const ai = getAI();
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Genera un plan de comidas (Desayuno, Almuerzo, Cena, Snack) para un paciente con: ${profile.diagnoses.join(', ')}. Evitar: ${profile.forbiddenFoods.join(', ')}. Objetivo: ${profile.goals}.`,
+      contents: `Plan de comidas para: ${profile.diagnoses.join(', ')}. Objetivo: ${profile.goals}.`,
       config: { 
           responseMimeType: "application/json",
           responseSchema: {
@@ -98,8 +142,7 @@ export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[
           }
       }
     }));
-    const data = JSON.parse(response.text || "[]");
-    return Array.isArray(data) ? data : [];
+    return JSON.parse(response.text || "[]");
 };
 
 export const generateMealImage = async (mealDescription: string): Promise<string | null> => {
@@ -107,13 +150,11 @@ export const generateMealImage = async (mealDescription: string): Promise<string
   try {
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
-        contents: { parts: [{ text: `High quality food photography: ${mealDescription}` }] }
+        contents: { parts: [{ text: `Food photography: ${mealDescription}` }] }
       }));
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       return part?.inlineData ? await compressBase64Image(part.inlineData.data) : null;
-  } catch (error) {
-      return `https://placehold.co/600x400/e2e8f0/475569?text=Comida`;
-  }
+  } catch (error) { return null; }
 };
 
 export const generateExerciseImage = async (exerciseName: string): Promise<string | null> => {
@@ -121,20 +162,33 @@ export const generateExerciseImage = async (exerciseName: string): Promise<strin
   try {
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
-        contents: { parts: [{ text: `Person doing exercise: ${exerciseName}, clean fitness environment, illustrative style.` }] }
+        contents: { parts: [{ text: `Fitness illustration: ${exerciseName}, professional white background.` }] }
       }));
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       return part?.inlineData ? await compressBase64Image(part.inlineData.data) : null;
-  } catch (error) {
-      return `https://placehold.co/400x400/f8fafc/ea580c?text=${encodeURIComponent(exerciseName)}`;
-  }
+  } catch (error) { return null; }
+};
+
+export const analyzePrescription = async (input: string, isImage: boolean): Promise<any[]> => {
+    const ai = getAI();
+    const prompt = `Extrae medicamentos de la receta. JSON Array.`;
+    let contents = isImage 
+        ? { parts: [{ inlineData: { mimeType: 'image/png', data: input.split(',')[1] } }, { text: prompt }] } 
+        : { parts: [{ text: `${input}. ${prompt}` }] };
+    
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents,
+      config: { responseMimeType: "application/json" }
+    }));
+    return JSON.parse(response.text || "[]");
 };
 
 export const generateExerciseRoutine = async (profile: UserProfile): Promise<ExerciseRoutine | null> => {
     const ai = getAI();
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Rutina de ejercicios para ${profile.age} años con ${profile.diagnoses.join(', ')}. Nivel: ${profile.activityLevel}.`,
+      contents: `Rutina semanal para: ${profile.diagnoses.join(', ')}. Distribuye 0-6.`,
       config: { 
           responseMimeType: "application/json",
           responseSchema: {
@@ -142,16 +196,22 @@ export const generateExerciseRoutine = async (profile: UserProfile): Promise<Exe
               properties: {
                   title: { type: Type.STRING },
                   description: { type: Type.STRING },
-                  durationMinutes: { type: Type.NUMBER },
                   intensity: { type: Type.STRING },
                   exercises: {
                       type: Type.ARRAY,
                       items: {
                           type: Type.OBJECT,
                           properties: {
+                              id: { type: Type.STRING },
                               name: { type: Type.STRING },
+                              sets: { type: Type.NUMBER },
+                              repsPerSet: { type: Type.STRING },
                               reps: { type: Type.STRING },
-                              tips: { type: Type.STRING }
+                              tips: { type: Type.STRING },
+                              benefits: { type: Type.STRING },
+                              medicalReasoning: { type: Type.STRING },
+                              medicalCaution: { type: Type.STRING },
+                              scheduledDay: { type: Type.NUMBER }
                           }
                       }
                   },
