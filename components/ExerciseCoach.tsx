@@ -109,7 +109,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
             <h2 className="text-2xl font-bold text-orange-700 flex items-center gap-2">
             <span>🏃‍♂️</span> Entrenador AI
             </h2>
-            <p className="text-gray-500 text-sm">Fraccionamiento y adaptación inteligente de rutinas.</p>
+            <p className="text-gray-500 text-sm">Adaptación y fraccionamiento inteligente de ejercicios.</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
             {currentRoutine && (
@@ -131,7 +131,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                 disabled={loading}
                 className="flex-1 md:flex-none bg-orange-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 shadow-md transition-all active:scale-95"
             >
-                {loading ? 'Consultando...' : '✨ Nueva IA'}
+                {loading ? 'Analizando...' : '✨ Nueva IA'}
             </button>
         </div>
       </div>
@@ -159,7 +159,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
       {loading && (
           <div className="py-24 text-center">
               <div className="text-6xl mb-4 animate-bounce">🦾</div>
-              <p className="text-orange-600 font-black italic text-xl animate-pulse uppercase tracking-widest">Fraccionando volumen para tu seguridad...</p>
+              <p className="text-orange-600 font-black italic text-xl animate-pulse uppercase tracking-widest">Personalizando tu carga de trabajo...</p>
           </div>
       )}
 
@@ -168,7 +168,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
               <div className="bg-gradient-to-r from-orange-50 to-white p-5 rounded-2xl border-l-8 border-orange-500 flex flex-col md:flex-row justify-between items-center gap-3">
                   <div className="text-center md:text-left">
                       <h3 className="font-black text-orange-900 leading-tight uppercase tracking-tighter text-xl">{currentRoutine.title}</h3>
-                      <p className="text-xs text-orange-700 font-medium">Original: {currentRoutine.originalMethod || "Adaptado VidaSalud"}</p>
+                      <p className="text-xs text-orange-700 font-medium">Original: {currentRoutine.originalMethod || "Método Saludable"}</p>
                   </div>
                   <div className="text-[10px] bg-white text-orange-600 px-4 py-1 rounded-full font-black border-2 border-orange-200 shadow-sm uppercase tracking-widest">
                       Nivel: {currentRoutine.intensity}
@@ -179,7 +179,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                   {getDayExercises(currentDay).length === 0 ? (
                       <div className="col-span-full py-16 text-center bg-gray-50 rounded-3xl border-4 border-dashed border-gray-100">
                           <div className="text-4xl mb-2 opacity-30">🛌</div>
-                          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Día de Recuperación Activa</p>
+                          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Día de Recuperación</p>
                       </div>
                   ) : (
                       getDayExercises(currentDay).map((ex) => (
@@ -209,7 +209,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                                       )}
                                   </div>
                               </div>
-                              <button onClick={() => moveExerciseToTomorrow(ex.id)} className="p-3 bg-gray-50 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition opacity-0 group-hover:opacity-100">
+                              <button onClick={() => moveExerciseToTomorrow(ex.id)} title="Postergar" className="p-3 bg-gray-50 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition opacity-0 group-hover:opacity-100">
                                   🗓️
                               </button>
                           </div>
@@ -224,7 +224,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
           <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
               <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl animate-scale-in border border-gray-100">
                   <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">📥 Importar Actividad</h3>
+                      <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">📥 Importar Rutina</h3>
                       <button onClick={() => setImporting(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
                   </div>
                   
@@ -234,7 +234,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                               <span className="text-2xl">🔄</span>
                               <div className="leading-none">
                                   <p className="text-xs font-black text-orange-900 uppercase">Modo Combinar</p>
-                                  <p className="text-[10px] text-orange-700 font-medium">Fusionar con rutina actual</p>
+                                  <p className="text-[10px] text-orange-700 font-medium">No sobreescribir la actual</p>
                               </div>
                           </div>
                           <button 
@@ -248,14 +248,14 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                       <label className="block border-4 border-dashed border-gray-100 rounded-[2rem] p-12 text-center cursor-pointer hover:bg-gray-50 hover:border-orange-300 transition-all group">
                           <input type="file" accept="image/*" onChange={handleImport} className="hidden" />
                           <span className="text-5xl block mb-3 group-hover:rotate-6 transition-transform">📄</span>
-                          <span className="font-black text-gray-700 uppercase tracking-widest text-[10px]">Analizar PDF o Captura</span>
+                          <span className="font-black text-gray-700 uppercase tracking-widest text-[10px]">Escanear PDF o Captura</span>
                       </label>
 
                       <div className="relative">
                           <textarea 
                             value={importText}
                             onChange={(e) => setImportText(e.target.value)}
-                            placeholder="O pega el texto (ej: 100 abdominales, 10km run...)"
+                            placeholder="Pega el texto aquí..."
                             className="w-full h-32 border-4 border-gray-50 rounded-2xl p-4 text-sm focus:ring-0 focus:border-orange-200 outline-none transition-all resize-none font-medium"
                           />
                           <button 
@@ -271,7 +271,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
           </div>
       )}
 
-      {/* Modal Detalle (Idéntico pero con medicalReasoning prominente) */}
+      {/* Modal Detalle */}
       {selectedExercise && (
           <div className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
               <div className="bg-white w-full max-w-xl rounded-[3rem] overflow-hidden shadow-2xl animate-scale-in flex flex-col max-h-[90vh]">
@@ -280,7 +280,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                           <img src={selectedExercise.imageUrl} className="w-full h-full object-cover opacity-80" alt={selectedExercise.name} />
                       ) : (
                           <div className="w-full h-full flex items-center justify-center text-white/20 animate-pulse">
-                              <span className="text-4xl">👟</span>
+                              <span className="text-4xl">🏃</span>
                           </div>
                       )}
                       <button onClick={() => setSelectedExercise(null)} className="absolute top-8 right-8 bg-white/10 hover:bg-white/30 text-white w-12 h-12 rounded-full backdrop-blur-xl flex items-center justify-center text-xl transition">✕</button>
@@ -298,10 +298,10 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                       <div className="bg-blue-50 p-6 rounded-[2rem] border-2 border-blue-100">
                           <div className="flex items-center gap-2 mb-3">
                               <span className="text-xl">🩺</span>
-                              <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Por qué hacerlo (Médico)</h5>
+                              <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Beneficio Clínico</h5>
                           </div>
                           <p className="text-xs text-blue-900 leading-relaxed font-bold italic">
-                              "{selectedExercise.medicalReasoning || "Seleccionado para mejorar tu respuesta glucémica y cardiovascular de forma controlada."}"
+                              "{selectedExercise.medicalReasoning || "Ejercicio adaptado para mejorar tu capacidad cardiovascular de forma segura."}"
                           </p>
                       </div>
 
@@ -325,9 +325,9 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
 
                       <button 
                         onClick={() => { toggleComplete(selectedExercise.id); setSelectedExercise(null); }}
-                        className={`w-full py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-sm transition-all shadow-2xl hover:scale-[1.03] active:scale-95 ${selectedExercise.completed ? 'bg-gray-100 text-gray-400' : 'bg-orange-600 text-white shadow-orange-200'}`}
+                        className={`w-full py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-sm transition-all shadow-2xl hover:scale-[1.03] active:scale-95 ${selectedExercise.completed ? 'bg-gray-100 text-gray-400' : 'bg-orange-600 text-white'}`}
                       >
-                          {selectedExercise.completed ? 'Pendiente' : 'Marcar Completado'}
+                          {selectedExercise.completed ? 'Pendiente' : 'Completado'}
                       </button>
                   </div>
               </div>

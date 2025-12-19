@@ -16,6 +16,19 @@ const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promis
     }
 };
 
+const safeJsonParse = (text: string | undefined) => {
+    if (!text) return null;
+    try {
+        // Limpiar posibles bloques de código markdown que el modelo pueda incluir
+        const cleanText = text.replace(/```json\n?|```/g, '').trim();
+        return JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Error al parsear JSON de Gemini:", e);
+        // Intentar rescatar lo que sea posible si está truncado (opcional, aquí devolvemos null para seguridad)
+        return null;
+    }
+};
+
 const compressBase64Image = (base64Str: string): Promise<string> => {
     return new Promise((resolve) => {
         try {
@@ -64,10 +77,10 @@ export const analyzeAndAdaptRoutine = async (
     if (existingRoutine) {
         systemPrompt += `
         MODO COMBINAR: El usuario YA TIENE una rutina: "${existingRoutine.title}". 
-        INTEGRA los nuevos ejercicios con los existentes. 
-        - Si hay ejercicios similares, suma el volumen o mantén la versión más segura. 
-        - NO dupliques ejercicios.
-        - Asegúrate de que el tiempo total diario no exceda los 45-60 minutos.`;
+        INTEGRA los nuevos ejercicios con los existentes de forma equilibrada. 
+        - Si hay ejercicios similares, ajusta el volumen total. 
+        - NO dupliques esfuerzos idénticos.
+        - Asegúrate de que el tiempo total diario no exceda los 60 minutos.`;
     }
 
     let parts: any[] = [{ text: systemPrompt }];
@@ -116,7 +129,7 @@ export const analyzeAndAdaptRoutine = async (
           }
       }
     }));
-    return JSON.parse(response.text || "null");
+    return safeJsonParse(response.text);
 };
 
 export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[]> => {
@@ -142,7 +155,7 @@ export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[
           }
       }
     }));
-    return JSON.parse(response.text || "[]");
+    return safeJsonParse(response.text) || [];
 };
 
 export const generateMealImage = async (mealDescription: string): Promise<string | null> => {
@@ -150,7 +163,7 @@ export const generateMealImage = async (mealDescription: string): Promise<string
   try {
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
-        contents: { parts: [{ text: `Food photography: ${mealDescription}` }] }
+        contents: { parts: [{ text: `High quality food photography: ${mealDescription}` }] }
       }));
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       return part?.inlineData ? await compressBase64Image(part.inlineData.data) : null;
@@ -162,7 +175,7 @@ export const generateExerciseImage = async (exerciseName: string): Promise<strin
   try {
       const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-2.5-flash-image', 
-        contents: { parts: [{ text: `Fitness illustration: ${exerciseName}, professional white background.` }] }
+        contents: { parts: [{ text: `Fitness demonstration: ${exerciseName}, professional, clear background.` }] }
       }));
       const part = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
       return part?.inlineData ? await compressBase64Image(part.inlineData.data) : null;
@@ -181,14 +194,14 @@ export const analyzePrescription = async (input: string, isImage: boolean): Prom
       contents,
       config: { responseMimeType: "application/json" }
     }));
-    return JSON.parse(response.text || "[]");
+    return safeJsonParse(response.text) || [];
 };
 
 export const generateExerciseRoutine = async (profile: UserProfile): Promise<ExerciseRoutine | null> => {
     const ai = getAI();
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Rutina semanal para: ${profile.diagnoses.join(', ')}. Distribuye 0-6.`,
+      contents: `Rutina semanal adaptada para: ${profile.diagnoses.join(', ')}. Distribuye en 0-6.`,
       config: { 
           responseMimeType: "application/json",
           responseSchema: {
@@ -220,5 +233,5 @@ export const generateExerciseRoutine = async (profile: UserProfile): Promise<Exe
           }
       }
     }));
-    return JSON.parse(response.text || "null");
+    return safeJsonParse(response.text);
 };
