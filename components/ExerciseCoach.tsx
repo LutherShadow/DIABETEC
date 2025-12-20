@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { UserProfile, ExerciseRoutine, Exercise } from '../types';
 import { generateExerciseRoutine, generateExerciseImage, analyzeAndAdaptRoutine } from '../services/geminiService';
 
@@ -15,9 +15,29 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
   const [importing, setImporting] = useState(false);
   const [shouldCombine, setShouldCombine] = useState(false);
   const [importText, setImportText] = useState('');
-  const [currentDay, setCurrentDay] = useState(new Date().getDay());
+  
+  // Ahora guardamos la fecha completa seleccionada, no solo el índice 0-6
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const daysLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const monthsLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  // Generar 14 días a partir del inicio de la semana actual
+  const calendarDays = useMemo(() => {
+    const dates = [];
+    const today = new Date();
+    // Empezamos desde el domingo de la semana actual
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay());
+    
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }, []);
 
   // Determinar si la rutina actual necesita adaptación
   const isRoutineAdapted = useMemo(() => {
@@ -64,7 +84,6 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
     reader.onloadend = async () => {
         const base64 = reader.result as string;
         const context = shouldCombine ? currentRoutine : null;
-        // Al importar desde cero, marcamos isAdapted: false si no pasa por la IA (pero aquí si pasa)
         const result = await analyzeAndAdaptRoutine(base64, profile, true, context);
         if (result) onUpdate({ ...profile, exerciseRoutine: result });
         setLoading(false);
@@ -96,16 +115,23 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
 
   const moveExerciseToTomorrow = (exerciseId: string) => {
     if (!currentRoutine) return;
-    const nextDay = (currentDay + 1) % 7;
+    // Mover al día siguiente en el ciclo de 7 días
+    const currentRoutineDay = selectedDate.getDay();
+    const nextRoutineDay = (currentRoutineDay + 1) % 7;
     const newExercises = currentRoutine.exercises.map(ex => 
-        ex.id === exerciseId ? { ...ex, scheduledDay: nextDay, completed: false } : ex
+        ex.id === exerciseId ? { ...ex, scheduledDay: nextRoutineDay, completed: false } : ex
     );
     onUpdate({ ...profile, exerciseRoutine: { ...currentRoutine, exercises: newExercises } });
-    alert("Ejercicio postergado para mañana 🗓️. La IA mantendrá el balance semanal.");
+    alert("Ejercicio postergado para el siguiente día del ciclo 🗓️.");
   };
 
-  const getDayExercises = (dayIdx: number) => {
-    return currentRoutine?.exercises.filter(ex => ex.scheduledDay === dayIdx) || [];
+  const getDayExercises = (date: Date) => {
+    const routineDay = date.getDay(); // 0-6
+    return currentRoutine?.exercises.filter(ex => ex.scheduledDay === routineDay) || [];
+  };
+
+  const isSameDay = (d1: Date, d2: Date) => {
+      return d1.getDate() === d2.getDate() && d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear();
   };
 
   const openDetails = async (ex: Exercise) => {
@@ -182,68 +208,95 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
           <div className="flex items-center gap-3">
               <span className="text-xl">📊</span>
               <div>
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Configuración Médica Actual</p>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Contexto de Salud</p>
                   <p className="text-xs font-bold text-gray-700">
                     Nivel: <span className="text-orange-600 uppercase">{profile.activityLevel}</span> | 
                     Diagnósticos: <span className="text-teal-700">{profile.diagnoses.join(', ') || 'General'}</span>
                   </p>
               </div>
           </div>
-          <p className="text-[9px] text-gray-400 italic text-right max-w-[150px] leading-tight">La IA usa estos datos para ajustar series y descansos.</p>
+          <p className="text-[9px] text-gray-400 italic text-right max-w-[150px] leading-tight">La IA ajusta reps y descanso según estos datos.</p>
       </div>
 
-      {/* Selector de Día */}
-      <div className="flex justify-between bg-gray-50 p-2 rounded-2xl border overflow-x-auto no-scrollbar shadow-inner">
-        {days.map((day, idx) => {
-            const hasExercises = getDayExercises(idx).length > 0;
-            return (
-                <button 
-                    key={day}
-                    onClick={() => setCurrentDay(idx)}
-                    className={`flex-1 min-w-[50px] py-3 px-1 rounded-xl transition-all flex flex-col items-center relative ${currentDay === idx ? 'bg-orange-600 text-white shadow-lg font-bold scale-105 z-10' : 'text-gray-400 hover:bg-orange-50'}`}
-                >
-                    <span className="text-[10px] uppercase tracking-widest mb-0.5">{day}</span>
-                    <span className="text-sm font-black">{new Date().getDate() + (idx - new Date().getDay())}</span>
-                    {hasExercises && (
-                        <div className={`w-1.5 h-1.5 rounded-full absolute bottom-1 ${currentDay === idx ? 'bg-white' : 'bg-orange-500'}`}></div>
-                    )}
-                </button>
-            )
-        })}
+      {/* Selector de Calendario Extendido (14 Días) */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center px-1">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                {monthsLabels[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+            </span>
+            <span className="text-[9px] text-gray-400 font-bold uppercase">Ciclo de 7 días adaptado</span>
+        </div>
+        <div 
+            ref={scrollContainerRef}
+            className="flex gap-2 overflow-x-auto no-scrollbar py-2 px-1 snap-x shadow-inner rounded-2xl bg-gray-50/50 border border-gray-100"
+        >
+            {calendarDays.map((date, idx) => {
+                const isSelected = isSameDay(date, selectedDate);
+                const isToday = isSameDay(date, new Date());
+                const exercises = getDayExercises(date);
+                const hasExercises = exercises.length > 0;
+                
+                return (
+                    <button 
+                        key={idx}
+                        onClick={() => setSelectedDate(date)}
+                        className={`flex-shrink-0 w-16 py-4 rounded-2xl transition-all flex flex-col items-center snap-center relative border-2 ${
+                            isSelected 
+                            ? 'bg-orange-600 border-orange-400 text-white shadow-xl scale-110 z-10' 
+                            : 'bg-white border-transparent text-gray-400 hover:border-orange-100 hover:bg-orange-50/30'
+                        }`}
+                    >
+                        <span className={`text-[9px] uppercase font-black tracking-tighter mb-1 ${isSelected ? 'text-orange-100' : 'text-gray-400'}`}>
+                            {daysLabels[date.getDay()]}
+                        </span>
+                        <span className="text-lg font-black leading-none">{date.getDate()}</span>
+                        
+                        {isToday && !isSelected && (
+                            <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
+                        )}
+                        
+                        {hasExercises && (
+                            <div className={`w-1 h-1 rounded-full absolute bottom-2 ${isSelected ? 'bg-white' : 'bg-orange-300'}`}></div>
+                        )}
+                    </button>
+                )
+            })}
+        </div>
       </div>
 
       {loading && (
           <div className="py-24 text-center">
               <div className="text-6xl mb-4 animate-bounce">🦾</div>
-              <p className="text-orange-600 font-black italic text-xl animate-pulse uppercase tracking-widest">Optimizando según tu diagnóstico...</p>
+              <p className="text-orange-600 font-black italic text-xl animate-pulse uppercase tracking-widest">Personalizando rutina...</p>
           </div>
       )}
 
       {!loading && currentRoutine && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in">
               <div className="bg-gradient-to-r from-orange-50 to-white p-5 rounded-2xl border-l-8 border-orange-500 flex flex-col md:flex-row justify-between items-center gap-3">
                   <div className="text-center md:text-left">
                       <h3 className="font-black text-orange-900 leading-tight uppercase tracking-tighter text-xl">{currentRoutine.title}</h3>
-                      <p className="text-xs text-orange-700 font-medium">Fuente: {currentRoutine.originalMethod || "Adaptado por VidaSalud"}</p>
+                      <p className="text-xs text-orange-700 font-medium">Ciclo: {currentRoutine.originalMethod || "VidaSalud AI Custom"}</p>
                   </div>
                   <div className="flex gap-2 items-center">
                       <div className={`text-[10px] px-4 py-1 rounded-full font-black border-2 shadow-sm uppercase tracking-widest ${isRoutineAdapted ? 'bg-green-50 text-green-600 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
                           {isRoutineAdapted ? '✅ IA Optimizada' : '⚠️ Pendiente'}
                       </div>
                       <div className="text-[10px] bg-white text-orange-600 px-4 py-1 rounded-full font-black border-2 border-orange-200 shadow-sm uppercase tracking-widest">
-                          Nivel: {currentRoutine.intensity}
+                          {currentRoutine.intensity}
                       </div>
                   </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {getDayExercises(currentDay).length === 0 ? (
-                      <div className="col-span-full py-16 text-center bg-gray-50 rounded-3xl border-4 border-dashed border-gray-100">
-                          <div className="text-4xl mb-2 opacity-30">🛌</div>
-                          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Descanso Adaptativo</p>
+                  {getDayExercises(selectedDate).length === 0 ? (
+                      <div className="col-span-full py-20 text-center bg-gray-50 rounded-[2.5rem] border-4 border-dashed border-gray-100 flex flex-col items-center">
+                          <div className="text-5xl mb-3 opacity-30 grayscale">🛌</div>
+                          <p className="text-gray-400 font-black uppercase tracking-[0.2em] text-[10px]">Descanso y Recuperación</p>
+                          <p className="text-[10px] text-gray-300 mt-1">Tu cuerpo necesita tiempo para reparar fibras musculares.</p>
                       </div>
                   ) : (
-                      getDayExercises(currentDay).map((ex) => (
+                      getDayExercises(selectedDate).map((ex) => (
                           <div key={ex.id} className={`group border-2 rounded-3xl p-5 transition-all flex items-center gap-4 ${ex.completed ? 'bg-green-50 border-green-200 opacity-60' : 'bg-white hover:border-orange-400 shadow-md'}`}>
                               <button 
                                 onClick={() => toggleComplete(ex.id)}
@@ -269,7 +322,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                                           </span>
                                       )}
                                       {!ex.isAdapted && (
-                                          <span className="text-[9px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-black border border-red-100 animate-pulse">NO ADAPTADO</span>
+                                          <span className="text-[9px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-black border border-red-100 animate-pulse">REVISAR</span>
                                       )}
                                   </div>
                               </div>
@@ -298,7 +351,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                               <span className="text-2xl">🔄</span>
                               <div className="leading-none">
                                   <p className="text-xs font-black text-orange-900 uppercase">Combinar con actual</p>
-                                  <p className="text-[10px] text-orange-700 font-medium">Integra ejercicios nuevos</p>
+                                  <p className="text-[10px] text-orange-700 font-medium">No reemplaza, suma</p>
                               </div>
                           </div>
                           <button 
@@ -327,7 +380,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                             value={importText}
                             onChange={(e) => setImportText(e.target.value)}
                             placeholder="Pega el texto de la rutina aquí..."
-                            className="w-full h-32 border-4 border-gray-50 rounded-2xl p-4 text-sm focus:ring-0 focus:border-orange-200 outline-none transition-all resize-none font-medium"
+                            className="w-full h-32 border-4 border-gray-50 rounded-2xl p-4 text-sm focus:ring-0 focus:border-orange-200 outline-none transition-all resize-none font-medium text-gray-900"
                           />
                           <button 
                             onClick={handleTextImport}
