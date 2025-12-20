@@ -29,6 +29,18 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
     }
   };
 
+  const handleReadapt = async () => {
+      if (!currentRoutine) return;
+      setLoading(true);
+      try {
+          const result = await analyzeAndAdaptRoutine("RE-ADAPTAR ESTA RUTINA AL PERFIL ACTUAL", profile, false, currentRoutine);
+          if (result) onUpdate({ ...profile, exerciseRoutine: result });
+          alert("Rutina re-adaptada exitosamente a tu nivel de actividad y diagnóstico actual.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
   const clearRoutine = () => {
       if (window.confirm("¿Estás seguro de que quieres borrar toda tu rutina actual? Esta acción no se puede deshacer.")) {
           onUpdate({ ...profile, exerciseRoutine: null });
@@ -111,14 +123,23 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
             </h2>
             <p className="text-gray-500 text-sm">Adaptación y fraccionamiento inteligente de ejercicios.</p>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
             {currentRoutine && (
-                <button 
-                    onClick={clearRoutine}
-                    className="flex-1 md:flex-none border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50"
-                >
-                    Limpiar
-                </button>
+                <>
+                    <button 
+                        onClick={handleReadapt}
+                        disabled={loading}
+                        className="flex-1 md:flex-none bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-black uppercase tracking-widest border border-blue-200 hover:bg-blue-100 transition shadow-sm"
+                    >
+                        🔄 Re-adaptar
+                    </button>
+                    <button 
+                        onClick={clearRoutine}
+                        className="flex-1 md:flex-none border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50"
+                    >
+                        Limpiar
+                    </button>
+                </>
             )}
             <button 
                 onClick={() => setImporting(true)}
@@ -131,9 +152,24 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                 disabled={loading}
                 className="flex-1 md:flex-none bg-orange-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 shadow-md transition-all active:scale-95"
             >
-                {loading ? 'Analizando...' : '✨ Nueva IA'}
+                {loading ? 'Procesando...' : '✨ Nueva IA'}
             </button>
         </div>
+      </div>
+
+      {/* Profile Context Banner */}
+      <div className="bg-gray-50 p-4 rounded-2xl border flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+              <span className="text-xl">📊</span>
+              <div>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Configuración Médica Actual</p>
+                  <p className="text-xs font-bold text-gray-700">
+                    Nivel: <span className="text-orange-600 uppercase">{profile.activityLevel}</span> | 
+                    Diagnósticos: <span className="text-teal-700">{profile.diagnoses.join(', ') || 'General'}</span>
+                  </p>
+              </div>
+          </div>
+          <p className="text-[9px] text-gray-400 italic text-right max-w-[150px] leading-tight">La IA usa estos datos para ajustar series y descansos.</p>
       </div>
 
       {/* Selector de Día */}
@@ -159,7 +195,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
       {loading && (
           <div className="py-24 text-center">
               <div className="text-6xl mb-4 animate-bounce">🦾</div>
-              <p className="text-orange-600 font-black italic text-xl animate-pulse uppercase tracking-widest">Personalizando tu carga de trabajo...</p>
+              <p className="text-orange-600 font-black italic text-xl animate-pulse uppercase tracking-widest">Optimizando según tu diagnóstico...</p>
           </div>
       )}
 
@@ -168,7 +204,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
               <div className="bg-gradient-to-r from-orange-50 to-white p-5 rounded-2xl border-l-8 border-orange-500 flex flex-col md:flex-row justify-between items-center gap-3">
                   <div className="text-center md:text-left">
                       <h3 className="font-black text-orange-900 leading-tight uppercase tracking-tighter text-xl">{currentRoutine.title}</h3>
-                      <p className="text-xs text-orange-700 font-medium">Original: {currentRoutine.originalMethod || "Método Saludable"}</p>
+                      <p className="text-xs text-orange-700 font-medium">Fuente: {currentRoutine.originalMethod || "Adaptado por VidaSalud"}</p>
                   </div>
                   <div className="text-[10px] bg-white text-orange-600 px-4 py-1 rounded-full font-black border-2 border-orange-200 shadow-sm uppercase tracking-widest">
                       Nivel: {currentRoutine.intensity}
@@ -179,7 +215,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                   {getDayExercises(currentDay).length === 0 ? (
                       <div className="col-span-full py-16 text-center bg-gray-50 rounded-3xl border-4 border-dashed border-gray-100">
                           <div className="text-4xl mb-2 opacity-30">🛌</div>
-                          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Día de Recuperación</p>
+                          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Descanso Adaptativo</p>
                       </div>
                   ) : (
                       getDayExercises(currentDay).map((ex) => (
@@ -224,7 +260,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
           <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
               <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl animate-scale-in border border-gray-100">
                   <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">📥 Importar Rutina</h3>
+                      <h3 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">📥 Importar y Adaptar</h3>
                       <button onClick={() => setImporting(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
                   </div>
                   
@@ -233,8 +269,8 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                           <div className="flex items-center gap-3">
                               <span className="text-2xl">🔄</span>
                               <div className="leading-none">
-                                  <p className="text-xs font-black text-orange-900 uppercase">Modo Combinar</p>
-                                  <p className="text-[10px] text-orange-700 font-medium">No sobreescribir la actual</p>
+                                  <p className="text-xs font-black text-orange-900 uppercase">Combinar con actual</p>
+                                  <p className="text-[10px] text-orange-700 font-medium">Integra ejercicios nuevos</p>
                               </div>
                           </div>
                           <button 
@@ -245,17 +281,24 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                           </button>
                       </div>
 
+                      <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
+                          <span className="text-xl">🩺</span>
+                          <p className="text-[10px] text-blue-800 font-medium leading-relaxed">
+                              Al importar, la IA ajustará automáticamente el número de series y el tipo de movimiento según tu nivel <b>{profile.activityLevel}</b> y diagnóstico <b>{profile.diagnoses.join(', ') || 'general'}</b>.
+                          </p>
+                      </div>
+
                       <label className="block border-4 border-dashed border-gray-100 rounded-[2rem] p-12 text-center cursor-pointer hover:bg-gray-50 hover:border-orange-300 transition-all group">
                           <input type="file" accept="image/*" onChange={handleImport} className="hidden" />
                           <span className="text-5xl block mb-3 group-hover:rotate-6 transition-transform">📄</span>
-                          <span className="font-black text-gray-700 uppercase tracking-widest text-[10px]">Escanear PDF o Captura</span>
+                          <span className="font-black text-gray-700 uppercase tracking-widest text-[10px]">Analizar PDF o Captura</span>
                       </label>
 
                       <div className="relative">
                           <textarea 
                             value={importText}
                             onChange={(e) => setImportText(e.target.value)}
-                            placeholder="Pega el texto aquí..."
+                            placeholder="Pega el texto de la rutina aquí..."
                             className="w-full h-32 border-4 border-gray-50 rounded-2xl p-4 text-sm focus:ring-0 focus:border-orange-200 outline-none transition-all resize-none font-medium"
                           />
                           <button 
@@ -298,10 +341,10 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                       <div className="bg-blue-50 p-6 rounded-[2rem] border-2 border-blue-100">
                           <div className="flex items-center gap-2 mb-3">
                               <span className="text-xl">🩺</span>
-                              <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Beneficio Clínico</h5>
+                              <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-700">Por qué es seguro para ti</h5>
                           </div>
                           <p className="text-xs text-blue-900 leading-relaxed font-bold italic">
-                              "{selectedExercise.medicalReasoning || "Ejercicio adaptado para mejorar tu capacidad cardiovascular de forma segura."}"
+                              "{selectedExercise.medicalReasoning || "Este ejercicio ha sido adaptado para tu nivel y condición médica."}"
                           </p>
                       </div>
 

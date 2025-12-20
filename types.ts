@@ -89,4 +89,4 @@ export interface UserProfile {
   exerciseRoutine?: ExerciseRoutine | null;
 }
 
-export type ViewState = 'login' | 'onboarding' | 'dashboard' | 'meals' | 'medications' | 'exercise';
+export type ViewState = 'login' | 'onboarding' | 'dashboard' | 'meals' | 'medications' | 'exercise' | 'profile';

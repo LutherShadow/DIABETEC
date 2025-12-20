@@ -19,12 +19,10 @@ const retry = async <T>(fn: () => Promise<T>, retries = 3, delay = 4000): Promis
 const safeJsonParse = (text: string | undefined) => {
     if (!text) return null;
     try {
-        // Limpiar posibles bloques de código markdown que el modelo pueda incluir
         const cleanText = text.replace(/```json\n?|```/g, '').trim();
         return JSON.parse(cleanText);
     } catch (e) {
         console.error("Error al parsear JSON de Gemini:", e);
-        // Intentar rescatar lo que sea posible si está truncado (opcional, aquí devolvemos null para seguridad)
         return null;
     }
 };
@@ -65,33 +63,36 @@ export const analyzeAndAdaptRoutine = async (
 ): Promise<ExerciseRoutine | null> => {
     const ai = getAI();
     let systemPrompt = `Eres un Médico Fisioterapeuta y Entrenador de Élite. 
-    TAREA: Analiza la nueva rutina adjunta (ej: Darebee, One Punch Man, etc.).
-    PERFIL MÉDICO: El usuario tiene ${profile.diagnoses.join(', ')}.
+    TAREA: Analiza o RE-ADAPTA la rutina adjunta basándote estrictamente en el perfil del usuario.
     
-    REGLAS CRÍTICAS:
-    1. FRACCIONAMIENTO: Si detectas volúmenes altos (ej: 100 flexiones), DIVIDELOS en series manejables (ej: 5 series de 20) con descanso.
-    2. SEGURIDAD: Adapta ejercicios de alto impacto a versiones seguras para sus patologías.
+    PERFIL MÉDICO: El usuario tiene ${profile.diagnoses.join(', ')}.
+    NIVEL DE ACTIVIDAD ACTUAL: ${profile.activityLevel}.
+    EDAD: ${profile.age} años. PESO: ${profile.weight} kg.
+    
+    REGLAS CRÍTICAS DE ADAPTACIÓN:
+    1. FRACCIONAMIENTO: Si la rutina es de alto volumen (ej: 100 reps), divídela en series (sets) según el nivel "${profile.activityLevel}". 
+       - Si es 'sedentary' o 'light', series muy cortas con mucho descanso.
+       - Si es 'active', series moderadas.
+    2. SEGURIDAD: Evita impactos si hay problemas articulares. Adapta ejercicios peligrosos por versiones "Low Impact".
     3. CALENDARIO: Distribuye en 0-6 (Dom-Sab).
-    4. REZONAMIENTO: Explica en 'medicalReasoning' el beneficio para su condición específica.`;
+    4. RAZONAMIENTO MÉDICO: En 'medicalReasoning' explica detalladamente por qué cada ejercicio es seguro y beneficioso para sus diagnósticos específicos.`;
 
     if (existingRoutine) {
         systemPrompt += `
-        MODO COMBINAR: El usuario YA TIENE una rutina: "${existingRoutine.title}". 
-        INTEGRA los nuevos ejercicios con los existentes de forma equilibrada. 
-        - Si hay ejercicios similares, ajusta el volumen total. 
-        - NO dupliques esfuerzos idénticos.
-        - Asegúrate de que el tiempo total diario no exceda los 60 minutos.`;
+        MODO COMBINAR O RE-ADAPTAR: El usuario ya tiene una rutina previa.
+        - Si es una nueva rutina externa, COMBÍNALA con la actual sin exceder la fatiga recomendada para su nivel "${profile.activityLevel}".
+        - Si es una solicitud de RE-ADAPTACIÓN, ajusta los ejercicios existentes para que encajen mejor con su salud actual.`;
     }
 
     let parts: any[] = [{ text: systemPrompt }];
     if (isImage) {
         parts.push({ inlineData: { mimeType: 'image/jpeg', data: content.split(',')[1] } });
     } else {
-        parts.push({ text: `Nueva rutina a procesar: ${content}` });
+        parts.push({ text: `Contenido de la rutina: ${content}` });
     }
 
     if (existingRoutine) {
-        parts.push({ text: `Rutina actual para combinar: ${JSON.stringify(existingRoutine)}` });
+        parts.push({ text: `Rutina base para procesar: ${JSON.stringify(existingRoutine)}` });
     }
 
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
@@ -201,7 +202,7 @@ export const generateExerciseRoutine = async (profile: UserProfile): Promise<Exe
     const ai = getAI();
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Rutina semanal adaptada para: ${profile.diagnoses.join(', ')}. Distribuye en 0-6.`,
+      contents: `Crea una rutina de ejercicios adaptada al nivel ${profile.activityLevel} y diagnósticos ${profile.diagnoses.join(', ')}. Distribuye en 0-6.`,
       config: { 
           responseMimeType: "application/json",
           responseSchema: {

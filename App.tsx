@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import MealPlanner from './components/MealPlanner';
 import MedicationManager from './components/MedicationManager';
 import ExerciseCoach from './components/ExerciseCoach';
+import ProfileEditor from './components/ProfileEditor';
 import Login from './components/Login';
 
 const App: React.FC = () => {
@@ -55,7 +56,6 @@ const App: React.FC = () => {
                     const scheduledTotalMinutes = h * 60 + m;
                     const diff = scheduledTotalMinutes - currentTotalMinutes;
 
-                    // Alerta de Preparación: Exactamente 10 minutos antes
                     if (diff === 10) {
                         const preKey = `pre-${med.id}-${timeStr}-${todayStr}`;
                         if (!sentNotifications.current.has(preKey)) {
@@ -64,7 +64,6 @@ const App: React.FC = () => {
                         }
                     }
 
-                    // Alerta Crítica: Hora exacta (ventana de 2 min para asegurar detección)
                     if (diff <= 0 && diff >= -2) {
                         const notifKey = `now-${med.id}-${timeStr}-${todayStr}`;
                         if (!sentNotifications.current.has(notifKey)) {
@@ -130,13 +129,14 @@ const App: React.FC = () => {
           </div>
       )}
 
-      <aside className="hidden md:flex flex-col w-72 bg-white border-r h-screen sticky top-0 shadow-sm">
+      <aside className="hidden md:flex flex-col w-72 bg-white border-r h-screen sticky top-0 shadow-sm overflow-y-auto no-scrollbar">
         <div className="p-8 border-b font-black text-teal-700 text-2xl uppercase tracking-tighter">🩺 VidaSalud AI</div>
         <nav className="flex-1 p-6 space-y-3">
           <NavBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon="🏠" label="Inicio" />
           <NavBtn active={view === 'medications'} onClick={() => setView('medications')} icon="💊" label="Medicinas" />
           <NavBtn active={view === 'meals'} onClick={() => setView('meals')} icon="🥗" label="Nutrición" />
           <NavBtn active={view === 'exercise'} onClick={() => setView('exercise')} icon="🏃‍♂️" label="Actividad" />
+          <NavBtn active={view === 'profile'} onClick={() => setView('profile')} icon="👤" label="Mi Perfil" />
         </nav>
         <div className="p-6">
             <button onClick={handleLogout} className="w-full p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition border border-red-100">Cerrar Sesión</button>
@@ -148,13 +148,15 @@ const App: React.FC = () => {
         {view === 'medications' && <MedicationManager profile={profile} onUpdate={handleProfileUpdate} />}
         {view === 'meals' && <MealPlanner profile={profile} onUpdate={handleProfileUpdate} />}
         {view === 'exercise' && <ExerciseCoach profile={profile} onUpdate={handleProfileUpdate} />}
+        {view === 'profile' && <ProfileEditor profile={profile} onUpdate={handleProfileUpdate} />}
       </main>
 
       <div className="md:hidden fixed bottom-6 left-6 right-6 bg-white/80 backdrop-blur-xl border border-white/20 rounded-[2.5rem] flex justify-around p-4 z-50 shadow-2xl">
-          <button onClick={() => setView('dashboard')} className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all ${view==='dashboard'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🏠</button>
-          <button onClick={() => setView('medications')} className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all ${view==='medications'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>💊</button>
-          <button onClick={() => setView('meals')} className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all ${view==='meals'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🥗</button>
-          <button onClick={() => setView('exercise')} className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all ${view==='exercise'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🏃‍♂️</button>
+          <button onClick={() => setView('dashboard')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='dashboard'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🏠</button>
+          <button onClick={() => setView('medications')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='medications'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>💊</button>
+          <button onClick={() => setView('meals')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='meals'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🥗</button>
+          <button onClick={() => setView('exercise')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='exercise'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🏃‍♂️</button>
+          <button onClick={() => setView('profile')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='profile'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>👤</button>
       </div>
     </div>
   );
