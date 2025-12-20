@@ -81,6 +81,7 @@ export interface UserProfile {
   allowedFoods: string[];
   forbiddenFoods: string[];
   allergies: string[];
+  foodPreferences?: string; // Nueva preferencia detallada (ej: Vegano, Keto, sin picante)
   goals: string;
   medications: Medication[];
   history: MedicationLog[]; 

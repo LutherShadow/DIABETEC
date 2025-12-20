@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserProfile, ExerciseRoutine, Exercise } from '../types';
 import { generateExerciseRoutine, generateExerciseImage, analyzeAndAdaptRoutine } from '../services/geminiService';
 
@@ -19,6 +19,12 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
 
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+  // Determinar si la rutina actual necesita adaptación
+  const isRoutineAdapted = useMemo(() => {
+    if (!currentRoutine) return true;
+    return currentRoutine.exercises.every(ex => ex.isAdapted);
+  }, [currentRoutine]);
+
   const handleGenerate = async () => {
     setLoading(true);
     try {
@@ -34,8 +40,10 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
       setLoading(true);
       try {
           const result = await analyzeAndAdaptRoutine("RE-ADAPTAR ESTA RUTINA AL PERFIL ACTUAL", profile, false, currentRoutine);
-          if (result) onUpdate({ ...profile, exerciseRoutine: result });
-          alert("Rutina re-adaptada exitosamente a tu nivel de actividad y diagnóstico actual.");
+          if (result) {
+              onUpdate({ ...profile, exerciseRoutine: result });
+              alert("Rutina optimizada con éxito ✅. Ahora cada ejercicio respeta tu nivel de actividad y diagnóstico.");
+          }
       } finally {
           setLoading(false);
       }
@@ -56,6 +64,7 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
     reader.onloadend = async () => {
         const base64 = reader.result as string;
         const context = shouldCombine ? currentRoutine : null;
+        // Al importar desde cero, marcamos isAdapted: false si no pasa por la IA (pero aquí si pasa)
         const result = await analyzeAndAdaptRoutine(base64, profile, true, context);
         if (result) onUpdate({ ...profile, exerciseRoutine: result });
         setLoading(false);
@@ -129,9 +138,9 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                     <button 
                         onClick={handleReadapt}
                         disabled={loading}
-                        className="flex-1 md:flex-none bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-black uppercase tracking-widest border border-blue-200 hover:bg-blue-100 transition shadow-sm"
+                        className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-black uppercase tracking-widest border transition shadow-sm ${!isRoutineAdapted ? 'bg-orange-600 border-orange-500 text-white animate-pulse' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'}`}
                     >
-                        🔄 Re-adaptar
+                        {isRoutineAdapted ? '🔄 Re-adaptar' : '⚡ Adaptar Ahora'}
                     </button>
                     <button 
                         onClick={clearRoutine}
@@ -156,6 +165,17 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
             </button>
         </div>
       </div>
+
+      {/* Banner de Advertencia si no está adaptada */}
+      {!isRoutineAdapted && currentRoutine && (
+          <div className="bg-orange-50 border-2 border-orange-200 p-4 rounded-2xl flex items-center gap-4">
+              <span className="text-3xl animate-bounce">⚠️</span>
+              <div>
+                  <h4 className="text-sm font-black text-orange-900 uppercase">Rutina no optimizada</h4>
+                  <p className="text-xs text-orange-700">Esta rutina no ha sido filtrada por la IA para tus diagnósticos. Podría ser de alto impacto. <b>Usa el botón "Adaptar Ahora"</b>.</p>
+              </div>
+          </div>
+      )}
 
       {/* Profile Context Banner */}
       <div className="bg-gray-50 p-4 rounded-2xl border flex items-center justify-between gap-4">
@@ -206,8 +226,13 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                       <h3 className="font-black text-orange-900 leading-tight uppercase tracking-tighter text-xl">{currentRoutine.title}</h3>
                       <p className="text-xs text-orange-700 font-medium">Fuente: {currentRoutine.originalMethod || "Adaptado por VidaSalud"}</p>
                   </div>
-                  <div className="text-[10px] bg-white text-orange-600 px-4 py-1 rounded-full font-black border-2 border-orange-200 shadow-sm uppercase tracking-widest">
-                      Nivel: {currentRoutine.intensity}
+                  <div className="flex gap-2 items-center">
+                      <div className={`text-[10px] px-4 py-1 rounded-full font-black border-2 shadow-sm uppercase tracking-widest ${isRoutineAdapted ? 'bg-green-50 text-green-600 border-green-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                          {isRoutineAdapted ? '✅ IA Optimizada' : '⚠️ Pendiente'}
+                      </div>
+                      <div className="text-[10px] bg-white text-orange-600 px-4 py-1 rounded-full font-black border-2 border-orange-200 shadow-sm uppercase tracking-widest">
+                          Nivel: {currentRoutine.intensity}
+                      </div>
                   </div>
               </div>
 
@@ -242,6 +267,9 @@ const ExerciseCoach: React.FC<Props> = ({ profile, onUpdate }) => {
                                           <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md font-black italic uppercase">
                                               {ex.reps}
                                           </span>
+                                      )}
+                                      {!ex.isAdapted && (
+                                          <span className="text-[9px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-black border border-red-100 animate-pulse">NO ADAPTADO</span>
                                       )}
                                   </div>
                               </div>

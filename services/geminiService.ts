@@ -63,25 +63,21 @@ export const analyzeAndAdaptRoutine = async (
 ): Promise<ExerciseRoutine | null> => {
     const ai = getAI();
     let systemPrompt = `Eres un Médico Fisioterapeuta y Entrenador de Élite. 
-    TAREA: Analiza o RE-ADAPTA la rutina adjunta basándote estrictamente en el perfil del usuario.
+    TAREA: Analiza o RE-ADAPTAR la rutina adjunta basándote estrictamente en el perfil del usuario.
     
     PERFIL MÉDICO: El usuario tiene ${profile.diagnoses.join(', ')}.
     NIVEL DE ACTIVIDAD ACTUAL: ${profile.activityLevel}.
     EDAD: ${profile.age} años. PESO: ${profile.weight} kg.
     
     REGLAS CRÍTICAS DE ADAPTACIÓN:
-    1. FRACCIONAMIENTO: Si la rutina es de alto volumen (ej: 100 reps), divídela en series (sets) según el nivel "${profile.activityLevel}". 
-       - Si es 'sedentary' o 'light', series muy cortas con mucho descanso.
-       - Si es 'active', series moderadas.
-    2. SEGURIDAD: Evita impactos si hay problemas articulares. Adapta ejercicios peligrosos por versiones "Low Impact".
+    1. FRACCIONAMIENTO: Ajusta series (sets) y reps según el nivel "${profile.activityLevel}".
+    2. SEGURIDAD: Evita impactos si hay problemas articulares. 
     3. CALENDARIO: Distribuye en 0-6 (Dom-Sab).
-    4. RAZONAMIENTO MÉDICO: En 'medicalReasoning' explica detalladamente por qué cada ejercicio es seguro y beneficioso para sus diagnósticos específicos.`;
+    4. MARCA DE ADAPTACIÓN: Todos los ejercicios devueltos DEBEN tener isAdapted: true.`;
 
     if (existingRoutine) {
         systemPrompt += `
-        MODO COMBINAR O RE-ADAPTAR: El usuario ya tiene una rutina previa.
-        - Si es una nueva rutina externa, COMBÍNALA con la actual sin exceder la fatiga recomendada para su nivel "${profile.activityLevel}".
-        - Si es una solicitud de RE-ADAPTACIÓN, ajusta los ejercicios existentes para que encajen mejor con su salud actual.`;
+        MODO RE-ADAPTACIÓN: Estás optimizando una rutina ya existente. Mejora el medicalReasoning para cada ejercicio explicando por qué es óptimo para: ${profile.diagnoses.join(', ')}.`;
     }
 
     let parts: any[] = [{ text: systemPrompt }];
@@ -121,7 +117,8 @@ export const analyzeAndAdaptRoutine = async (
                               benefits: { type: Type.STRING },
                               medicalReasoning: { type: Type.STRING },
                               medicalCaution: { type: Type.STRING },
-                              scheduledDay: { type: Type.NUMBER }
+                              scheduledDay: { type: Type.NUMBER },
+                              isAdapted: { type: Type.BOOLEAN }
                           }
                       }
                   },
@@ -135,9 +132,19 @@ export const analyzeAndAdaptRoutine = async (
 
 export const generateDailyMealPlan = async (profile: UserProfile): Promise<Meal[]> => {
     const ai = getAI();
+    let prompt = `Diseña un plan de comidas saludable para un usuario con los siguientes diagnósticos: ${profile.diagnoses.join(', ')}.
+    Objetivo: ${profile.goals}.
+    Alimentos permitidos: ${profile.allowedFoods.join(', ')}.
+    Alimentos prohibidos (EVITAR TOTALMENTE): ${profile.forbiddenFoods.join(', ')}.
+    Alergias: ${profile.allergies.join(', ') || 'Ninguna'}.`;
+
+    if (profile.foodPreferences) {
+        prompt += `\nPreferencias específicas del usuario (IMPORTANTE): ${profile.foodPreferences}.`;
+    }
+
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Plan de comidas para: ${profile.diagnoses.join(', ')}. Objetivo: ${profile.goals}.`,
+      contents: prompt,
       config: { 
           responseMimeType: "application/json",
           responseSchema: {
@@ -225,7 +232,8 @@ export const generateExerciseRoutine = async (profile: UserProfile): Promise<Exe
                               benefits: { type: Type.STRING },
                               medicalReasoning: { type: Type.STRING },
                               medicalCaution: { type: Type.STRING },
-                              scheduledDay: { type: Type.NUMBER }
+                              scheduledDay: { type: Type.NUMBER },
+                              isAdapted: { type: Type.BOOLEAN }
                           }
                       }
                   },
