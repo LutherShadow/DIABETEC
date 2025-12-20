@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { saveProfile, setUserId } from '../services/storageService';
@@ -17,11 +18,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
     medications: []
   });
   
-  // Local state for the inputs in Step 3
   const [allowedInput, setAllowedInput] = useState('');
   const [forbiddenInput, setForbiddenInput] = useState('');
-  
-  // Step 1: Identification
   const [email, setEmail] = useState('');
 
   const handleNext = () => setStep(p => p + 1);
@@ -34,7 +32,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
         return;
     }
 
-    // Set the User ID to the email for Supabase keying
     setUserId(email.trim().toLowerCase());
 
     const finalProfile = {
@@ -65,7 +62,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
     setEmail("demo@vidasalud.ai");
   };
 
-  // Helper for Chip/Tag Input Logic
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>, 
     field: 'allowedFoods' | 'forbiddenFoods', 
@@ -77,14 +73,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
       const trimmed = inputValue.trim().replace(/,/g, '');
       if (trimmed) {
         const currentList = formData[field] || [];
-        // Prevent duplicates
         if (!currentList.includes(trimmed)) {
             setFormData({ ...formData, [field]: [...currentList, trimmed] });
         }
         setInput('');
       }
     } else if (e.key === 'Backspace' && !inputValue) {
-       // Remove last item if input is empty
        const currentList = formData[field] || [];
        if (currentList.length > 0) {
            const newList = [...currentList];
@@ -100,74 +94,74 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
       setFormData({ ...formData, [field]: newList });
   };
 
-  // Validation Logic for UI Feedback
   const isDiabetic = formData.diagnoses?.some(d => d.toLowerCase().includes('diabetes'));
   const hasSugarInAllowed = formData.allowedFoods?.some(f => f.toLowerCase().includes('azúcar') || f.toLowerCase().includes('azucar') || f.toLowerCase().includes('dulce'));
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-lg mt-10 text-gray-800">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-teal-700">Perfil de Salud</h2>
-        <p className="text-gray-500">Paso {step} de 3</p>
-        <div className="w-full bg-gray-200 h-2 rounded-full mt-2">
-          <div className="bg-teal-500 h-2 rounded-full transition-all duration-300" style={{ width: `${(step / 3) * 100}%` }}></div>
+    <div className="max-w-2xl mx-auto p-10 bg-white rounded-[2.5rem] shadow-2xl mt-10 text-slate-800 border border-slate-100 animate-fade-in mb-10">
+      <div className="mb-10 text-center">
+        <img src="/logo.png" alt="VidaSalud AI" className="w-48 mx-auto mb-6" />
+        <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Perfil de Salud</h2>
+        <p className="text-slate-500 font-medium text-sm">Paso {step} de 3</p>
+        <div className="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden">
+          <div className="bg-teal-600 h-2 rounded-full transition-all duration-500 shadow-sm" style={{ width: `${(step / 3) * 100}%` }}></div>
         </div>
       </div>
 
       {step === 1 && (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold text-gray-800">Datos Básicos</h3>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Datos Básicos</h3>
                 <div className="flex gap-4 items-center">
-                    <button onClick={loadDemoData} className="text-xs text-teal-600 underline font-medium">Demo</button>
-                    <button onClick={onLoginClick} className="text-sm bg-teal-50 text-teal-700 px-3 py-1 rounded-lg border border-teal-200 hover:bg-teal-100">¿Ya tienes cuenta?</button>
+                    <button onClick={loadDemoData} className="text-xs text-teal-600 font-black uppercase tracking-widest hover:underline">Demo</button>
+                    <button onClick={onLoginClick} className="text-[10px] font-black uppercase tracking-widest bg-teal-50 text-teal-700 px-4 py-2 rounded-xl border border-teal-200 hover:bg-teal-100">Login</button>
                 </div>
             </div>
           
           <div>
-             <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico (Tu ID)</label>
+             <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Correo Electrónico (Tu ID)</label>
              <input 
-              type="email" placeholder="ejemplo@correo.com" className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+              type="email" placeholder="ejemplo@correo.com" className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
               value={email} onChange={e => setEmail(e.target.value)}
              />
-             <p className="text-xs text-gray-400 mt-1">Usaremos esto para guardar tu progreso en la nube.</p>
+             <p className="text-[10px] text-slate-400 mt-2 italic">Usaremos esto para sincronizar tus planes en la nube.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Nombre</label>
                 <input 
-                type="text" placeholder="Tu nombre" className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+                type="text" placeholder="Tu nombre" className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
                 value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})}
                 />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Edad</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Edad</label>
                 <input 
-                type="number" placeholder="Ej: 30" className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+                type="number" placeholder="Ej: 30" className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
                 value={formData.age || ''} onChange={e => setFormData({...formData, age: Number(e.target.value)})}
                 />
             </div>
-             <div className="flex gap-2">
+             <div className="flex gap-4">
                 <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Altura (cm)</label>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Altura (cm)</label>
                     <input 
-                    type="number" placeholder="170" className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+                    type="number" placeholder="170" className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
                     value={formData.height || ''} onChange={e => setFormData({...formData, height: Number(e.target.value)})}
                     />
                 </div>
                 <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Peso (kg)</label>
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Peso (kg)</label>
                     <input 
-                    type="number" placeholder="70" className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+                    type="number" placeholder="70" className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
                     value={formData.weight || ''} onChange={e => setFormData({...formData, weight: Number(e.target.value)})}
                     />
                 </div>
              </div>
              <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">Género</label>
+                 <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Género</label>
                 <select 
-                    className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+                    className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
                     value={formData.gender || 'other'} 
                     onChange={(e: any) => setFormData({...formData, gender: e.target.value})}
                 >
@@ -177,10 +171,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                 </select>
              </div>
           </div>
-          <div className="mt-4">
-             <label className="block text-sm font-medium text-gray-700 mb-1">Objetivo Principal</label>
+          <div>
+             <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Objetivo Principal</label>
              <input 
-              type="text" placeholder="Ej: Controlar glucosa, Perder 5kg..." className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+              type="text" placeholder="Ej: Controlar glucosa, Perder 5kg..." className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
               value={formData.goals || ''} onChange={e => setFormData({...formData, goals: e.target.value})}
             />
           </div>
@@ -188,28 +182,28 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
       )}
 
       {step === 2 && (
-        <div className="space-y-4 animate-fade-in">
-          <h3 className="text-xl font-semibold text-gray-800">Condición Médica</h3>
+        <div className="space-y-6 animate-fade-in">
+          <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Condición Médica</h3>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Diagnósticos</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Diagnósticos</label>
             <input 
-              type="text" placeholder="Ej: Diabetes Tipo 2, Hipertensión (separar por comas)" className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+              type="text" placeholder="Ej: Diabetes Tipo 2, Hipertensión (separar por comas)" className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
               value={formData.diagnoses?.join(', ') || ''} 
               onChange={e => setFormData({...formData, diagnoses: e.target.value.split(',').map(s => s.trim())})}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Alergias</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Alergias</label>
             <input 
-              type="text" placeholder="Ej: Nueces, Penicilina..." className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+              type="text" placeholder="Ej: Nueces, Penicilina..." className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
               value={formData.allergies?.join(', ') || ''} 
               onChange={e => setFormData({...formData, allergies: e.target.value.split(',').map(s => s.trim())})}
             />
           </div>
           <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nivel de Actividad</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-teal-700 mb-2">Nivel de Actividad</label>
                <select 
-                className="p-3 border border-gray-300 rounded-lg w-full bg-white text-gray-900 focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-teal-500 focus:bg-white bg-slate-50 outline-none transition-all font-bold text-slate-900"
                 value={formData.activityLevel || 'sedentary'} 
                 onChange={(e: any) => setFormData({...formData, activityLevel: e.target.value})}
              >
@@ -225,75 +219,72 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
       {step === 3 && (
         <div className="space-y-6 animate-fade-in">
           <div className="flex justify-between items-end">
-            <h3 className="text-xl font-semibold text-gray-800">Nutrición</h3>
-            <span className="text-xs text-gray-500 italic">Escribe y presiona Enter</span>
+            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Nutrición</h3>
+            <span className="text-[10px] text-slate-400 italic">Enter para agregar</span>
           </div>
           
-          {/* Allowed Foods Input */}
           <div>
-            <label className="block text-sm font-bold text-green-800 mb-2">✅ Alimentos Permitidos / Favoritos</label>
-            <div className={`flex flex-wrap items-center gap-2 p-3 border rounded-xl bg-white focus-within:ring-2 focus-within:ring-green-400 min-h-[80px] ${isDiabetic && hasSugarInAllowed ? 'border-red-300 ring-2 ring-red-100' : 'border-green-200'}`}>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-emerald-700 mb-2">✅ Permitidos / Favoritos</label>
+            <div className={`flex flex-wrap items-center gap-2 p-4 border-2 rounded-2xl bg-slate-50 min-h-[100px] transition-all ${isDiabetic && hasSugarInAllowed ? 'border-red-300 ring-4 ring-red-50 bg-red-50/20' : 'border-slate-100 focus-within:border-emerald-400 focus-within:bg-white'}`}>
                 {formData.allowedFoods?.map((food, idx) => (
-                    <span key={idx} className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 border border-green-200">
+                    <span key={idx} className="bg-emerald-100 text-emerald-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-200">
                         {food}
-                        <button onClick={() => removeTag('allowedFoods', idx)} className="hover:text-green-950 ml-1 font-bold">×</button>
+                        <button onClick={() => removeTag('allowedFoods', idx)} className="hover:text-emerald-950 font-bold">×</button>
                     </span>
                 ))}
                 <input 
                     type="text" 
-                    className="flex-1 min-w-[120px] outline-none bg-transparent text-gray-900 placeholder-gray-400 p-1"
-                    placeholder="Ej: Pollo, Espinaca, Atún..."
+                    className="flex-1 min-w-[120px] outline-none bg-transparent text-slate-900 placeholder-slate-400 p-1 font-bold"
+                    placeholder="Ej: Pollo, Espinaca..."
                     value={allowedInput}
                     onChange={(e) => setAllowedInput(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, 'allowedFoods', allowedInput, setAllowedInput)}
                 />
             </div>
             {isDiabetic && hasSugarInAllowed && (
-                <p className="text-xs text-red-600 mt-1 font-bold flex items-center gap-1">
-                    ⚠️ Advertencia: Tienes diabetes y has añadido azúcar/dulces a permitidos.
+                <p className="text-[10px] text-red-600 mt-2 font-black uppercase tracking-widest animate-pulse flex items-center gap-2">
+                    ⚠️ Advertencia: Diabético + Azúcares detectados
                 </p>
             )}
-            <p className="text-xs text-gray-500 mt-1">Presiona <kbd className="bg-gray-100 px-1 rounded">Enter</kbd> para agregar.</p>
           </div>
 
-          {/* Forbidden Foods Input */}
           <div>
-            <label className="block text-sm font-bold text-red-800 mb-2">🚫 Alimentos Prohibidos / A Evitar</label>
-            <div className="flex flex-wrap items-center gap-2 p-3 border border-red-200 rounded-xl bg-white focus-within:ring-2 focus-within:ring-red-400 min-h-[80px]">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-red-700 mb-2">🚫 Prohibidos / Evitar</label>
+            <div className="flex flex-wrap items-center gap-2 p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 min-h-[100px] focus-within:border-red-400 focus-within:bg-white transition-all">
                 {formData.forbiddenFoods?.map((food, idx) => (
-                    <span key={idx} className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 border border-red-200">
+                    <span key={idx} className="bg-red-100 text-red-800 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-red-200">
                         {food}
-                        <button onClick={() => removeTag('forbiddenFoods', idx)} className="hover:text-red-950 ml-1 font-bold">×</button>
+                        <button onClick={() => removeTag('forbiddenFoods', idx)} className="hover:text-red-950 font-bold">×</button>
                     </span>
                 ))}
                 <input 
                     type="text" 
-                    className="flex-1 min-w-[120px] outline-none bg-transparent text-gray-900 placeholder-gray-400 p-1"
-                    placeholder="Ej: Azúcar, Harina, Refrescos..."
+                    className="flex-1 min-w-[120px] outline-none bg-transparent text-slate-900 placeholder-slate-400 p-1 font-bold"
+                    placeholder="Ej: Azúcar, Harina..."
                     value={forbiddenInput}
                     onChange={(e) => setForbiddenInput(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, 'forbiddenFoods', forbiddenInput, setForbiddenInput)}
                 />
             </div>
-            <p className="text-xs text-gray-500 mt-1">La IA filtrará recetas que contengan estos ingredientes.</p>
+            <p className="text-[10px] text-slate-400 mt-2 italic font-medium">La IA filtrará estos ingredientes de tus recetas.</p>
           </div>
         </div>
       )}
 
-      <div className="flex justify-between mt-8 border-t pt-6">
+      <div className="flex justify-between mt-10 border-t border-slate-100 pt-8">
         {step > 1 ? (
-          <button onClick={handleBack} className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">
+          <button onClick={handleBack} className="px-8 py-4 rounded-2xl border-2 border-slate-100 text-slate-600 font-black uppercase tracking-widest text-xs hover:bg-slate-50 transition active:scale-95">
             Atrás
           </button>
         ) : <div></div>}
         
         {step < 3 ? (
-          <button onClick={handleNext} className="px-6 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-medium transition shadow-sm">
+          <button onClick={handleNext} className="px-10 py-4 rounded-2xl bg-teal-600 text-white hover:bg-teal-700 font-black uppercase tracking-widest text-xs transition shadow-xl active:scale-95 shadow-teal-100">
             Siguiente
           </button>
         ) : (
-          <button onClick={handleComplete} disabled={!email} className="px-6 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 font-bold shadow-md transition transform hover:scale-105 disabled:opacity-50">
-            Finalizar Perfil
+          <button onClick={handleComplete} disabled={!email} className="px-10 py-4 rounded-2xl bg-teal-600 text-white hover:bg-teal-700 font-black uppercase tracking-widest text-xs shadow-xl transition transform active:scale-95 disabled:opacity-50 shadow-teal-100">
+            Crear Mi Perfil IA
           </button>
         )}
       </div>

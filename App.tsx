@@ -16,7 +16,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'info'|'alert'} | null>(null);
   
-  // Ref para rastrear notificaciones ya enviadas en la sesión actual para evitar duplicados
   const sentNotifications = useRef<Set<string>>(new Set());
   const [hasKey, setHasKey] = useState<boolean>(true);
 
@@ -42,7 +41,6 @@ const App: React.FC = () => {
       }
   };
 
-  // --- SISTEMA DE ALERTAS REFACTORIZADO ---
   useEffect(() => {
     if (!profile || !profile.onboardingComplete) return;
 
@@ -58,7 +56,6 @@ const App: React.FC = () => {
                     const scheduledMins = h * 60 + m;
                     const diff = scheduledMins - currentMins;
 
-                    // 1. Alerta de "10 Minutos Antes"
                     if (diff === 10) {
                         const alertKey = `10min-${med.id}-${timeStr}-${todayStr}`;
                         if (!sentNotifications.current.has(alertKey)) {
@@ -71,7 +68,6 @@ const App: React.FC = () => {
                         }
                     }
 
-                    // 2. Alerta de "Hora Exacta" (Ventana de 2 mins por si el intervalo salta un ciclo)
                     if (diff <= 0 && diff >= -2) {
                         const alertKey = `now-${med.id}-${timeStr}-${todayStr}`;
                         if (!sentNotifications.current.has(alertKey)) {
@@ -89,25 +85,21 @@ const App: React.FC = () => {
     };
 
     const triggerSystemNotification = (title: string, body: string, type: 'info'|'alert', key: string) => {
-        // Marcamos como enviada primero para evitar carreras
         sentNotifications.current.add(key);
 
-        // Notificación de Navegador (Visible incluso si el usuario está en otra pestaña/app)
         if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(title, { 
                 body, 
-                icon: '/favicon.ico',
-                tag: key, // Evita duplicados en el centro de notificaciones del OS
-                requireInteraction: type === 'alert' // La notificación no desaparece hasta que el usuario interactúe
+                icon: '/logo.png',
+                tag: key,
+                requireInteraction: type === 'alert'
             });
         }
 
-        // Toast interno para cuando el usuario SÍ está en la app
         setToast({ message: `${title}: ${body}`, type });
         setTimeout(() => setToast(null), 15000);
     };
 
-    // Intervalo de chequeo cada 45 segundos para asegurar capturar el minuto exacto
     const interval = setInterval(checkMedications, 45000); 
     return () => clearInterval(interval);
   }, [profile]);
@@ -124,16 +116,21 @@ const App: React.FC = () => {
       sentNotifications.current.clear();
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-teal-600 font-black italic uppercase tracking-widest">Iniciando VidaSalud AI...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <img src="/logo.png" alt="VidaSalud AI Logo" className="w-48 mb-8 animate-pulse" />
+      <div className="text-teal-600 font-black italic uppercase tracking-widest animate-pulse">Iniciando VidaSalud AI...</div>
+    </div>
+  );
 
   if (!hasKey) {
       return (
           <div className="min-h-screen bg-teal-900 flex items-center justify-center p-6 text-center">
-              <div className="max-w-md bg-white p-8 rounded-[3rem] shadow-2xl">
-                  <div className="text-5xl mb-4">🔑</div>
+              <div className="max-w-md bg-white p-10 rounded-[3rem] shadow-2xl">
+                  <img src="/logo.png" alt="VidaSalud AI" className="w-32 mx-auto mb-6" />
                   <h1 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tighter">Configuración Requerida</h1>
-                  <p className="text-gray-600 mb-6 text-sm font-medium">Para acceder a las funciones de IA personalizada, selecciona tu API Key de Google AI Studio.</p>
-                  <button onClick={handleSelectKey} className="w-full bg-teal-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-teal-700 transition shadow-xl">Seleccionar Clave</button>
+                  <p className="text-gray-600 mb-8 text-sm font-medium">Para acceder a las funciones de IA personalizada, selecciona tu API Key de Google AI Studio.</p>
+                  <button onClick={handleSelectKey} className="w-full bg-teal-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-teal-700 transition shadow-xl active:scale-95">Seleccionar Clave</button>
               </div>
           </div>
       );
@@ -143,7 +140,7 @@ const App: React.FC = () => {
   if (!profile || !profile.onboardingComplete) return <Onboarding onComplete={() => { setProfile(getProfile()); setView('dashboard'); }} onLoginClick={() => setView('login')} />;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row relative">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
       {toast && (
           <div className={`fixed top-6 right-6 z-[200] p-6 rounded-[2rem] shadow-2xl flex items-center gap-4 animate-slide-in max-w-sm border-2 ${toast.type === 'alert' ? 'bg-orange-600 border-orange-400 text-white' : 'bg-teal-700 border-teal-500 text-white'}`}>
               <div className="text-3xl">{toast.type === 'alert' ? '🚨' : '⏰'}</div>
@@ -153,7 +150,9 @@ const App: React.FC = () => {
       )}
 
       <aside className="hidden md:flex flex-col w-72 bg-white border-r h-screen sticky top-0 shadow-sm overflow-y-auto no-scrollbar">
-        <div className="p-8 border-b font-black text-teal-700 text-2xl uppercase tracking-tighter">🩺 VidaSalud AI</div>
+        <div className="p-8 border-b">
+            <img src="/logo.png" alt="VidaSalud AI" className="w-full object-contain px-2" />
+        </div>
         <nav className="flex-1 p-6 space-y-3">
           <NavBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon="🏠" label="Inicio" />
           <NavBtn active={view === 'medications'} onClick={() => setView('medications')} icon="💊" label="Medicinas" />
@@ -162,11 +161,14 @@ const App: React.FC = () => {
           <NavBtn active={view === 'profile'} onClick={() => setView('profile')} icon="👤" label="Mi Perfil" />
         </nav>
         <div className="p-6">
-            <button onClick={handleLogout} className="w-full p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition border border-red-100">Cerrar Sesión</button>
+            <button onClick={handleLogout} className="w-full p-4 bg-red-50 text-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition border border-red-100 active:scale-95">Cerrar Sesión</button>
         </div>
       </aside>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full pb-28 md:pb-12 md:pt-12 px-4">
+      <main className="flex-1 max-w-5xl mx-auto w-full pb-28 md:pb-12 md:pt-12 px-4 animate-fade-in">
+        <div className="md:hidden flex justify-center py-4">
+            <img src="/logo.png" alt="VidaSalud AI" className="h-10" />
+        </div>
         {view === 'dashboard' && <Dashboard profile={profile} onChangeView={setView} onUpdate={handleProfileUpdate} />}
         {view === 'medications' && <MedicationManager profile={profile} onUpdate={handleProfileUpdate} />}
         {view === 'meals' && <MealPlanner profile={profile} onUpdate={handleProfileUpdate} />}
@@ -174,12 +176,12 @@ const App: React.FC = () => {
         {view === 'profile' && <ProfileEditor profile={profile} onUpdate={handleProfileUpdate} />}
       </main>
 
-      <div className="md:hidden fixed bottom-6 left-6 right-6 bg-white/90 backdrop-blur-xl border border-white/20 rounded-[2.5rem] flex justify-around p-4 z-50 shadow-2xl">
-          <button onClick={() => setView('dashboard')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='dashboard'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🏠</button>
-          <button onClick={() => setView('medications')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='medications'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>💊</button>
-          <button onClick={() => setView('meals')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='meals'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🥗</button>
-          <button onClick={() => setView('exercise')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='exercise'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🏃‍♂️</button>
-          <button onClick={() => setView('profile')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='profile'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>👤</button>
+      <div className="md:hidden fixed bottom-6 left-6 right-6 bg-white/90 backdrop-blur-xl border border-slate-200/50 rounded-[2.5rem] flex justify-around p-4 z-50 shadow-2xl">
+          <button onClick={() => setView('dashboard')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='dashboard'?'bg-teal-600 text-white shadow-lg scale-110':'text-gray-400'}`}>🏠</button>
+          <button onClick={() => setView('medications')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='medications'?'bg-teal-600 text-white shadow-lg scale-110':'text-gray-400'}`}>💊</button>
+          <button onClick={() => setView('meals')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='meals'?'bg-teal-600 text-white shadow-lg scale-110':'text-gray-400'}`}>🥗</button>
+          <button onClick={() => setView('exercise')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='exercise'?'bg-teal-600 text-white shadow-lg scale-110':'text-gray-400'}`}>🏃‍♂️</button>
+          <button onClick={() => setView('profile')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='profile'?'bg-teal-600 text-white shadow-lg scale-110':'text-gray-400'}`}>👤</button>
       </div>
     </div>
   );
