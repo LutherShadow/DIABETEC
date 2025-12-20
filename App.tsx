@@ -15,6 +15,8 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('onboarding');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{message: string, type: 'info'|'alert'} | null>(null);
+  
+  // Ref para rastrear notificaciones ya enviadas en la sesión actual para evitar duplicados
   const sentNotifications = useRef<Set<string>>(new Set());
   const [hasKey, setHasKey] = useState<boolean>(true);
 
@@ -40,35 +42,45 @@ const App: React.FC = () => {
       }
   };
 
-  // --- SISTEMA DE ALERTAS GLOBALES ---
+  // --- SISTEMA DE ALERTAS REFACTORIZADO ---
   useEffect(() => {
     if (!profile || !profile.onboardingComplete) return;
 
     const checkMedications = () => {
         const now = new Date();
-        const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+        const currentMins = now.getHours() * 60 + now.getMinutes();
         const todayStr = now.toDateString();
         
         profile.medications.forEach(med => {
             if (med.scheduleType === 'fixed' && med.fixedTimes && !med.takenToday) {
                 med.fixedTimes.forEach(timeStr => {
                     const [h, m] = timeStr.split(':').map(Number);
-                    const scheduledTotalMinutes = h * 60 + m;
-                    const diff = scheduledTotalMinutes - currentTotalMinutes;
+                    const scheduledMins = h * 60 + m;
+                    const diff = scheduledMins - currentMins;
 
+                    // 1. Alerta de "10 Minutos Antes"
                     if (diff === 10) {
-                        const preKey = `pre-${med.id}-${timeStr}-${todayStr}`;
-                        if (!sentNotifications.current.has(preKey)) {
-                            triggerAlert(`Preparación: ${med.name}`, `En 10 minutos debes tomar tu dosis (${med.dosage}).`, 'info');
-                            sentNotifications.current.add(preKey);
+                        const alertKey = `10min-${med.id}-${timeStr}-${todayStr}`;
+                        if (!sentNotifications.current.has(alertKey)) {
+                            triggerSystemNotification(
+                                `Preparación: ${med.name}`,
+                                `Dosis de ${med.dosage} en 10 minutos.`,
+                                'info',
+                                alertKey
+                            );
                         }
                     }
 
+                    // 2. Alerta de "Hora Exacta" (Ventana de 2 mins por si el intervalo salta un ciclo)
                     if (diff <= 0 && diff >= -2) {
-                        const notifKey = `now-${med.id}-${timeStr}-${todayStr}`;
-                        if (!sentNotifications.current.has(notifKey)) {
-                            triggerAlert(`🚨 HORA DE: ${med.name}`, `Es momento de tomar tus ${med.dosage}.`, 'alert');
-                            sentNotifications.current.add(notifKey);
+                        const alertKey = `now-${med.id}-${timeStr}-${todayStr}`;
+                        if (!sentNotifications.current.has(alertKey)) {
+                            triggerSystemNotification(
+                                `🚨 HORA DE TOMAR: ${med.name}`,
+                                `Es momento de tu dosis (${med.dosage}). No la ignores.`,
+                                'alert',
+                                alertKey
+                            );
                         }
                     }
                 });
@@ -76,15 +88,27 @@ const App: React.FC = () => {
         });
     };
 
-    const triggerAlert = (title: string, body: string, type: 'info'|'alert') => {
+    const triggerSystemNotification = (title: string, body: string, type: 'info'|'alert', key: string) => {
+        // Marcamos como enviada primero para evitar carreras
+        sentNotifications.current.add(key);
+
+        // Notificación de Navegador (Visible incluso si el usuario está en otra pestaña/app)
         if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, { body, icon: '/favicon.ico' });
+            new Notification(title, { 
+                body, 
+                icon: '/favicon.ico',
+                tag: key, // Evita duplicados en el centro de notificaciones del OS
+                requireInteraction: type === 'alert' // La notificación no desaparece hasta que el usuario interactúe
+            });
         }
+
+        // Toast interno para cuando el usuario SÍ está en la app
         setToast({ message: `${title}: ${body}`, type });
-        setTimeout(() => setToast(null), 12000);
+        setTimeout(() => setToast(null), 15000);
     };
 
-    const interval = setInterval(checkMedications, 30000); 
+    // Intervalo de chequeo cada 45 segundos para asegurar capturar el minuto exacto
+    const interval = setInterval(checkMedications, 45000); 
     return () => clearInterval(interval);
   }, [profile]);
 
@@ -107,10 +131,9 @@ const App: React.FC = () => {
           <div className="min-h-screen bg-teal-900 flex items-center justify-center p-6 text-center">
               <div className="max-w-md bg-white p-8 rounded-[3rem] shadow-2xl">
                   <div className="text-5xl mb-4">🔑</div>
-                  <h1 className="text-2xl font-black text-gray-800 mb-2 uppercase tracking-tighter">Configuración Requerida</h1>
-                  <p className="text-gray-500 mb-6 text-sm font-medium">Para acceder a las funciones de IA personalizada, selecciona tu API Key de Google AI Studio.</p>
+                  <h1 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tighter">Configuración Requerida</h1>
+                  <p className="text-gray-600 mb-6 text-sm font-medium">Para acceder a las funciones de IA personalizada, selecciona tu API Key de Google AI Studio.</p>
                   <button onClick={handleSelectKey} className="w-full bg-teal-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-teal-700 transition shadow-xl">Seleccionar Clave</button>
-                  <p className="mt-4 text-[10px] text-gray-400 font-bold uppercase tracking-widest">Requiere proyecto con facturación activa</p>
               </div>
           </div>
       );
@@ -122,9 +145,9 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row relative">
       {toast && (
-          <div className={`fixed top-6 right-6 z-[100] p-6 rounded-[2rem] shadow-2xl flex items-center gap-4 animate-slide-in max-w-sm border-2 ${toast.type === 'alert' ? 'bg-orange-600 border-orange-400 text-white' : 'bg-teal-700 border-teal-500 text-white'}`}>
+          <div className={`fixed top-6 right-6 z-[200] p-6 rounded-[2rem] shadow-2xl flex items-center gap-4 animate-slide-in max-w-sm border-2 ${toast.type === 'alert' ? 'bg-orange-600 border-orange-400 text-white' : 'bg-teal-700 border-teal-500 text-white'}`}>
               <div className="text-3xl">{toast.type === 'alert' ? '🚨' : '⏰'}</div>
-              <div className="flex-1 text-xs font-black uppercase tracking-widest">{toast.message}</div>
+              <div className="flex-1 text-xs font-black uppercase tracking-widest leading-tight">{toast.message}</div>
               <button onClick={() => setToast(null)} className="opacity-50 hover:opacity-100 text-xl font-bold">✕</button>
           </div>
       )}
@@ -151,7 +174,7 @@ const App: React.FC = () => {
         {view === 'profile' && <ProfileEditor profile={profile} onUpdate={handleProfileUpdate} />}
       </main>
 
-      <div className="md:hidden fixed bottom-6 left-6 right-6 bg-white/80 backdrop-blur-xl border border-white/20 rounded-[2.5rem] flex justify-around p-4 z-50 shadow-2xl">
+      <div className="md:hidden fixed bottom-6 left-6 right-6 bg-white/90 backdrop-blur-xl border border-white/20 rounded-[2.5rem] flex justify-around p-4 z-50 shadow-2xl">
           <button onClick={() => setView('dashboard')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='dashboard'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🏠</button>
           <button onClick={() => setView('medications')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='medications'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>💊</button>
           <button onClick={() => setView('meals')} className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all ${view==='meals'?'bg-teal-600 text-white shadow-lg':'text-gray-400'}`}>🥗</button>
