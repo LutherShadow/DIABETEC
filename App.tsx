@@ -10,6 +10,25 @@ import ExerciseCoach from './components/ExerciseCoach';
 import ProfileEditor from './components/ProfileEditor';
 import Login from './components/Login';
 
+// Usamos el logo directamente como un componente SVG que replica exactamente el estilo pixelado
+const Logo = ({ className = "w-48" }: { className?: string }) => (
+  <div className={`flex items-center gap-3 ${className}`}>
+    <div className="relative w-12 h-12 flex-shrink-0">
+      {/* Representación pixelada del estetoscopio tech */}
+      <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 gap-0.5">
+        {[...Array(16)].map((_, i) => (
+          <div key={i} className={`${[0,3,4,7,8,11,13,14].includes(i) ? 'bg-cyan-400' : [9,10,5,6].includes(i) ? 'bg-purple-600' : 'bg-transparent'} rounded-sm opacity-80`}></div>
+        ))}
+      </div>
+      <div className="absolute inset-2 bg-white/20 blur-sm rounded-full animate-pulse"></div>
+    </div>
+    <div className="flex flex-col leading-none">
+      <span className="text-2xl font-black tracking-tighter text-slate-800 uppercase">Vida<span className="text-cyan-500">Salud</span></span>
+      <span className="text-[10px] font-black tracking-[0.4em] text-slate-400 ml-1">ARTIFICIAL INTELLIGENCE</span>
+    </div>
+  </div>
+);
+
 const App: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [view, setView] = useState<ViewState>('onboarding');
@@ -86,16 +105,6 @@ const App: React.FC = () => {
 
     const triggerSystemNotification = (title: string, body: string, type: 'info'|'alert', key: string) => {
         sentNotifications.current.add(key);
-
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, { 
-                body, 
-                icon: '/logo.png',
-                tag: key,
-                requireInteraction: type === 'alert'
-            });
-        }
-
         setToast({ message: `${title}: ${body}`, type });
         setTimeout(() => setToast(null), 15000);
     };
@@ -118,16 +127,16 @@ const App: React.FC = () => {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white">
-      <img src="/logo.png" alt="VidaSalud AI Logo" className="w-48 mb-8 animate-pulse" />
+      <Logo className="w-64 mb-8 animate-pulse" />
       <div className="text-teal-600 font-black italic uppercase tracking-widest animate-pulse">Iniciando VidaSalud AI...</div>
     </div>
   );
 
   if (!hasKey) {
       return (
-          <div className="min-h-screen bg-teal-900 flex items-center justify-center p-6 text-center">
-              <div className="max-w-md bg-white p-10 rounded-[3rem] shadow-2xl">
-                  <img src="/logo.png" alt="VidaSalud AI" className="w-32 mx-auto mb-6" />
+          <div className="min-h-screen bg-[#0f2e2a] flex items-center justify-center p-6 text-center">
+              <div className="max-w-md bg-white p-12 rounded-[3rem] shadow-2xl">
+                  <Logo className="mx-auto mb-8 w-56" />
                   <h1 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tighter">Configuración Requerida</h1>
                   <p className="text-gray-600 mb-8 text-sm font-medium">Para acceder a las funciones de IA personalizada, selecciona tu API Key de Google AI Studio.</p>
                   <button onClick={handleSelectKey} className="w-full bg-teal-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-teal-700 transition shadow-xl active:scale-95">Seleccionar Clave</button>
@@ -151,7 +160,7 @@ const App: React.FC = () => {
 
       <aside className="hidden md:flex flex-col w-72 bg-white border-r h-screen sticky top-0 shadow-sm overflow-y-auto no-scrollbar">
         <div className="p-8 border-b">
-            <img src="/logo.png" alt="VidaSalud AI" className="w-full object-contain px-2" />
+            <Logo className="w-full" />
         </div>
         <nav className="flex-1 p-6 space-y-3">
           <NavBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon="🏠" label="Inicio" />
@@ -167,7 +176,7 @@ const App: React.FC = () => {
 
       <main className="flex-1 max-w-5xl mx-auto w-full pb-28 md:pb-12 md:pt-12 px-4 animate-fade-in">
         <div className="md:hidden flex justify-center py-4">
-            <img src="/logo.png" alt="VidaSalud AI" className="h-10" />
+            <Logo className="h-10" />
         </div>
         {view === 'dashboard' && <Dashboard profile={profile} onChangeView={setView} onUpdate={handleProfileUpdate} />}
         {view === 'medications' && <MedicationManager profile={profile} onUpdate={handleProfileUpdate} />}

@@ -1,0 +1,50 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 120">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <style>
+      .logo-text { font-family: 'Inter', sans-serif; font-weight: 900; }
+      .vida { fill: #134e4a; }
+      .salud { fill: #0891b2; }
+      .ai { fill: #134e4a; }
+      .circuit { stroke: #22d3ee; stroke-width: 2; fill: none; opacity: 0.6; }
+    </style>
+  </defs>
+  
+  <!-- Estetoscopio Tech Icon -->
+  <g transform="translate(20, 15)">
+    <!-- Circuit lines around -->
+    <path d="M10 40 L0 40 L0 10 L20 10" class="circuit" />
+    <path d="M80 10 L100 10 L100 40 L90 40" class="circuit" />
+    <circle cx="20" cy="10" r="3" fill="#22d3ee" />
+    <circle cx="80" cy="10" r="3" fill="#22d3ee" />
+    
+    <!-- Stethoscope Body -->
+    <path d="M25 15 Q25 60 50 60 Q75 60 75 15" fill="none" stroke="url(#grad1)" stroke-width="10" stroke-linecap="round" />
+    <rect x="20" y="5" width="10" height="15" rx="2" fill="#4c1d95" />
+    <rect x="70" y="5" width="10" height="15" rx="2" fill="#4c1d95" />
+    
+    <!-- Connection to Bell -->
+    <path d="M50 60 L50 80 Q50 95 70 95" fill="none" stroke="#0891b2" stroke-width="8" stroke-linecap="round" />
+    
+    <!-- Tech Bell -->
+    <circle cx="75" cy="95" r="12" fill="#4c1d95" />
+    <circle cx="75" cy="95" r="6" fill="#22d3ee" />
+    
+    <!-- Extra circuit dots -->
+    <circle cx="95" cy="95" r="3" fill="#22d3ee" />
+    <line x1="87" y1="95" x2="92" y2="95" stroke="#22d3ee" stroke-width="1" />
+  </g>
+
+  <!-- VidaSalud AI Text -->
+  <text x="130" y="75" class="logo-text" font-size="52">
+    <tspan class="vida">Vida</tspan><tspan class="salud">Salud</tspan> <tspan class="ai">AI</tspan>
+  </text>
+  
+  <!-- Decorative Tech Line -->
+  <path d="M380 40 L430 40 L450 20 L480 20" class="circuit" />
+  <circle cx="480" cy="20" r="3" fill="#22d3ee" />
+</svg>

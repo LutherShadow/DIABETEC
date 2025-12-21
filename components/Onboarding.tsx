@@ -3,6 +3,22 @@ import React, { useState } from 'react';
 import { UserProfile } from '../types';
 import { saveProfile, setUserId } from '../services/storageService';
 
+const Logo = () => (
+  <div className="flex items-center justify-center gap-3 mb-6">
+    <div className="relative w-12 h-12 flex-shrink-0">
+      <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 gap-0.5">
+        {[...Array(16)].map((_, i) => (
+          <div key={i} className={`${[0,3,4,7,8,11,13,14].includes(i) ? 'bg-cyan-400' : [9,10,5,6].includes(i) ? 'bg-purple-600' : 'bg-transparent'} rounded-sm`}></div>
+        ))}
+      </div>
+    </div>
+    <div className="flex flex-col leading-none text-left">
+      <span className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Vida<span className="text-cyan-500">Salud</span></span>
+      <span className="text-[10px] font-black tracking-[0.4em] text-slate-400">ARTIFICIAL INTELLIGENCE</span>
+    </div>
+  </div>
+);
+
 interface OnboardingProps {
   onComplete: () => void;
   onLoginClick: () => void;
@@ -98,9 +114,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
   const hasSugarInAllowed = formData.allowedFoods?.some(f => f.toLowerCase().includes('azúcar') || f.toLowerCase().includes('azucar') || f.toLowerCase().includes('dulce'));
 
   return (
-    <div className="max-w-2xl mx-auto p-10 bg-white rounded-[2.5rem] shadow-2xl mt-10 text-slate-800 border border-slate-100 animate-fade-in mb-10">
+    <div className="max-w-2xl mx-auto p-12 bg-white rounded-[2.5rem] shadow-2xl mt-10 text-slate-800 border border-slate-100 animate-fade-in mb-10">
       <div className="mb-10 text-center">
-        <img src="/logo.png" alt="VidaSalud AI" className="w-48 mx-auto mb-6" />
+        <Logo />
         <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Perfil de Salud</h2>
         <p className="text-slate-500 font-medium text-sm">Paso {step} de 3</p>
         <div className="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden">
@@ -241,11 +257,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                     onKeyDown={(e) => handleKeyDown(e, 'allowedFoods', allowedInput, setAllowedInput)}
                 />
             </div>
-            {isDiabetic && hasSugarInAllowed && (
-                <p className="text-[10px] text-red-600 mt-2 font-black uppercase tracking-widest animate-pulse flex items-center gap-2">
-                    ⚠️ Advertencia: Diabético + Azúcares detectados
-                </p>
-            )}
           </div>
 
           <div>
@@ -266,7 +277,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onLoginClick }) => 
                     onKeyDown={(e) => handleKeyDown(e, 'forbiddenFoods', forbiddenInput, setForbiddenInput)}
                 />
             </div>
-            <p className="text-[10px] text-slate-400 mt-2 italic font-medium">La IA filtrará estos ingredientes de tus recetas.</p>
           </div>
         </div>
       )}

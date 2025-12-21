@@ -2,6 +2,22 @@
 import React, { useState } from 'react';
 import { loginUser } from '../services/storageService';
 
+const Logo = () => (
+  <div className="flex items-center justify-center gap-3 mb-8">
+    <div className="relative w-12 h-12 flex-shrink-0">
+      <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 gap-0.5">
+        {[...Array(16)].map((_, i) => (
+          <div key={i} className={`${[0,3,4,7,8,11,13,14].includes(i) ? 'bg-cyan-400' : [9,10,5,6].includes(i) ? 'bg-purple-600' : 'bg-transparent'} rounded-sm`}></div>
+        ))}
+      </div>
+    </div>
+    <div className="flex flex-col leading-none text-left">
+      <span className="text-3xl font-black tracking-tighter text-slate-800 uppercase">Vida<span className="text-cyan-500">Salud</span></span>
+      <span className="text-[10px] font-black tracking-[0.4em] text-slate-400">ARTIFICIAL INTELLIGENCE</span>
+    </div>
+  </div>
+);
+
 interface LoginProps {
   onSuccess: () => void;
   onBack: () => void;
@@ -29,9 +45,9 @@ const Login: React.FC<LoginProps> = ({ onSuccess, onBack }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
+      <div className="max-w-md w-full bg-white p-12 rounded-[2.5rem] shadow-2xl border border-slate-100">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="VidaSalud AI Logo" className="w-48 mx-auto mb-6" />
+          <Logo />
           <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Bienvenido de nuevo</h2>
           <p className="text-slate-500 text-sm font-medium">Ingresa tu correo para recuperar tu historial.</p>
         </div>
